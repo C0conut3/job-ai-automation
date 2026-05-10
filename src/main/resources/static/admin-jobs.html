@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>管理员 - 职位与分类管理</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --text: #e6edf3;
+      --muted: #8b9cb3;
+      --accent: #58a6ff;
+      --danger: #f85149;
+      --ok: #3fb950;
+      --warn: #d29922;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; font-family: "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 1.75rem 1.25rem; }
+    .wrap { max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 1.35rem; margin: 0 0 1rem; }
+    .nav { margin-bottom: 1.25rem; font-size: 0.9rem; }
+    .nav a { color: var(--accent); text-decoration: none; margin-right: 0.5rem; }
+    .nav a:hover { text-decoration: underline; }
+    
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; }
+    .tabs button { flex: 1; padding: 0.6rem; border-radius: 8px; border: 1px solid #30363d; background: transparent; color: var(--muted); cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+    .tabs button.active { background: var(--card); color: var(--text); border-color: var(--accent); }
+    
+    .panel { display: none; }
+    .panel.active { display: block; }
+    
+    .toolbar { display: flex; justify-content: space-between; margin-bottom: 1rem; align-items: center; }
+    
+    .data-table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 0.9rem; }
+    .data-table th, .data-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #30363d; }
+    .data-table th { color: var(--muted); font-weight: 600; }
+    .data-table tr:hover td { background: rgba(255,255,255,0.03); }
+    
+    .badge { font-size: 0.75rem; font-weight: 700; padding: 0.15rem 0.4rem; border-radius: 4px; background: #30363d; color: var(--text); }
+    .badge.published { background: rgba(63, 185, 80, 0.2); color: var(--ok); }
+    .badge.withdrawn { background: rgba(210, 153, 34, 0.2); color: var(--warn); }
+    .badge.draft { background: rgba(139, 156, 179, 0.2); color: var(--muted); }
+    
+    button { padding: 0.4rem 0.8rem; border-radius: 6px; border: none; background: var(--accent); color: #0f1419; font-weight: 600; cursor: pointer; font-size: 0.85rem; }
+    button:hover { filter: brightness(1.1); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-sm { padding: 0.2rem 0.5rem; font-size: 0.8rem; }
+    .btn-out { background: transparent; color: var(--text); border: 1px solid #30363d; }
+    .btn-del { background: rgba(248, 81, 73, 0.2); color: var(--danger); border: 1px solid var(--danger); }
+    
+    .pagination { display: flex; justify-content: space-between; margin-top: 1rem; align-items: center; font-size: 0.85rem; }
+    .msg { font-size: 0.85rem; color: var(--danger); margin-bottom: 1rem; }
+    .unauth-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 3rem 2rem;
+      text-align: center;
+    }
+    .unauth-card h2 { margin: 0 0 1rem; color: var(--text); }
+    .unauth-card p { color: var(--muted); margin: 0 0 2rem; }
+    .unauth-card a {
+      display: inline-block;
+      padding: 0.6rem 1.5rem;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #0f1419;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .unauth-card a:hover { filter: brightness(1.1); }
+
+    /* Modals */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; padding: 1rem; z-index: 100; }
+    .modal-overlay.active { display: flex; }
+    .modal { background: var(--bg); border: 1px solid #30363d; border-radius: 12px; width: 100%; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; }
+    .modal-header { padding: 1.25rem; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; }
+    .modal-title { font-size: 1.2rem; font-weight: 600; margin: 0; }
+    .btn-close { background: transparent; color: var(--muted); font-size: 1.5rem; padding: 0; line-height: 1; margin: 0; border: none; }
+    .btn-close:hover { color: var(--text); background: transparent; border: none; }
+    .modal-body { padding: 1.25rem; overflow-y: auto; }
+    .modal-footer { padding: 1.25rem; border-top: 1px solid #30363d; display: flex; justify-content: flex-end; gap: 0.5rem; }
+    
+    label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 0.25rem; margin-top: 0.85rem; }
+    input, select, textarea { width: 100%; padding: 0.55rem 0.65rem; border-radius: 8px; border: 1px solid #30363d; background: #0d1117; color: var(--text); font-family: inherit; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+    .form-row { display: flex; gap: 1rem; }
+    .form-row > div { flex: 1; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>管理员 - 职位系统</h1>
+    <p class="nav">
+      <a href="/">返回首页</a>
+    </p>
+    
+    <div id="msg" class="msg"></div>
+
+    <div class="tabs">
+      <button type="button" class="active" data-tab="jobs">职位管理</button>
+      <button type="button" data-tab="categories">职位分类管理</button>
+    </div>
+
+    <!-- 职位管理面板 -->
+    <div id="panel-jobs" class="panel active">
+      <div class="toolbar">
+        <h2 style="font-size:1.1rem; margin:0;">全部职位</h2>
+        <button id="btn-create-job">新增职位</button>
+      </div>
+      <div style="overflow-x: auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th><th>标题</th><th>公司</th><th>招聘者ID</th><th>状态</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="job-tbody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="job-pagination">
+        <button id="job-btn-prev">上一页</button>
+        <span id="job-page-info"></span>
+        <button id="job-btn-next">下一页</button>
+      </div>
+    </div>
+
+    <!-- 职位分类管理面板 -->
+    <div id="panel-categories" class="panel">
+      <div class="toolbar">
+        <h2 style="font-size:1.1rem; margin:0;">职位分类</h2>
+        <button id="btn-create-cat">新增分类</button>
+      </div>
+      <div style="overflow-x: auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th><th>名称</th><th>描述</th><th>排序</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="cat-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Job Modal -->
+  <div class="modal-overlay" id="job-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="job-m-title">编辑职位</h2>
+        <button class="btn-close" onclick="closeModal('job-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="job-form">
+          <input type="hidden" id="j-id" />
+          <label>招聘者 User ID</label>
+          <input type="number" id="j-recruiter" required />
+          <label>职位名称</label>
+          <input type="text" id="j-title" required maxlength="255" />
+          <label>公司名称</label>
+          <input type="text" id="j-company" required maxlength="255" />
+          <div class="form-row">
+            <div><label>分类</label><select id="j-category"></select></div>
+            <div><label>工作类型</label>
+              <select id="j-work-type">
+                <option value="FULL_TIME">全职</option>
+                <option value="PART_TIME">兼职</option>
+                <option value="CONTRACT">合同工</option>
+                <option value="INTERNSHIP">实习</option>
+                <option value="REMOTE">远程</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div><label>最低薪资</label><input type="number" id="j-salary-min" /></div>
+            <div><label>最高薪资</label><input type="number" id="j-salary-max" /></div>
+          </div>
+          <label>工作城市</label>
+          <input type="text" id="j-city" maxlength="128" />
+          <label>状态</label>
+          <select id="j-status">
+            <option value="PUBLISHED">发布</option>
+            <option value="DRAFT">草稿</option>
+            <option value="WITHDRAWN">下架</option>
+          </select>
+          <label>职位描述</label>
+          <textarea id="j-desc" rows="4" required></textarea>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-out" onclick="closeModal('job-modal')">取消</button>
+        <button type="button" id="btn-save-job">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Category Modal -->
+  <div class="modal-overlay" id="cat-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="cat-m-title">编辑分类</h2>
+        <button class="btn-close" onclick="closeModal('cat-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="cat-form">
+          <input type="hidden" id="c-id" />
+          <label>名称</label>
+          <input type="text" id="c-name" required maxlength="128" />
+          <label>描述</label>
+          <textarea id="c-desc" rows="3" maxlength="512"></textarea>
+          <label>排序 (Sort Order)</label>
+          <input type="number" id="c-sort" value="0" />
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-out" onclick="closeModal('cat-modal')">取消</button>
+        <button type="button" id="btn-save-cat">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const msgEl = document.getElementById('msg');
+    
+    // Tabs logic
+    document.querySelectorAll('.tabs button').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+      };
+    });
+
+    async function parseApi(res) {
+      const text = await res.text();
+      try { return JSON.parse(text); } catch { return { success: false, message: text || "请求失败" }; }
+    }
+    function esc(s) {
+      if (s == null) return "";
+      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    const statusMap = { DRAFT: '草稿', PUBLISHED: '发布', WITHDRAWN: '下架' };
+    let categories = [];
+    let currentJobPage = 0;
+
+    // Load Categories
+    async function loadCategories() {
+      try {
+        const res = await fetch("/api/v1/admin/job-categories", { credentials: "include" });
+        const data = await parseApi(res);
+        if (res.status === 401 || res.status === 403) {
+          document.querySelector('.tabs').style.display = 'none';
+          document.querySelectorAll('.panel').forEach(p => p.style.display = 'none');
+          msgEl.innerHTML = `
+            <div class="unauth-card">
+              <h2>需要登录</h2>
+              <p>请先以管理员身份登录后管理系统数据</p>
+              <a href="/login.html">前往登录 / 注册</a>
+            </div>
+          `;
+          return;
+        }
+        if (data.success) {
+          categories = data.data;
+          renderCategories();
+          const sel = document.getElementById('j-category');
+          sel.innerHTML = '<option value="">无</option>' + categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+        }
+      } catch (err) {}
+    }
+
+    function renderCategories() {
+      const tbody = document.getElementById('cat-tbody');
+      if (categories.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted)">暂无分类</td></tr>';
+        return;
+      }
+      tbody.innerHTML = categories.map(c => `
+        <tr>
+          <td>${c.id}</td>
+          <td>${esc(c.name)}</td>
+          <td>${esc(c.description)}</td>
+          <td>${c.sortOrder || 0}</td>
+          <td>
+            <button class="btn-sm btn-out" onclick="editCat(${c.id})">编辑</button>
+            <button class="btn-sm btn-del" onclick="deleteCat(${c.id})">删除</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // Category CRUD
+    document.getElementById('btn-create-cat').onclick = () => {
+      document.getElementById('cat-form').reset();
+      document.getElementById('c-id').value = '';
+      document.getElementById('cat-m-title').textContent = '新增分类';
+      document.getElementById('cat-modal').classList.add('active');
+    };
+
+    window.editCat = (id) => {
+      const c = categories.find(x => x.id === id);
+      if (!c) return;
+      document.getElementById('c-id').value = c.id;
+      document.getElementById('c-name').value = c.name;
+      document.getElementById('c-desc').value = c.description || '';
+      document.getElementById('c-sort').value = c.sortOrder || 0;
+      document.getElementById('cat-m-title').textContent = '编辑分类';
+      document.getElementById('cat-modal').classList.add('active');
+    };
+
+    document.getElementById('btn-save-cat').onclick = async () => {
+      if (!document.getElementById('cat-form').reportValidity()) return;
+      const id = document.getElementById('c-id').value;
+      const payload = {
+        name: document.getElementById('c-name').value,
+        description: document.getElementById('c-desc').value,
+        sortOrder: parseInt(document.getElementById('c-sort').value) || 0
+      };
+      try {
+        const res = await fetch(id ? `/api/v1/admin/job-categories/${id}` : '/api/v1/admin/job-categories', {
+          method: id ? 'PUT' : 'POST',
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await parseApi(res);
+        if (!data.success) alert(data.message || "保存失败");
+        else { closeModal('cat-modal'); loadCategories(); }
+      } catch (err) { alert("网络错误"); }
+    };
+
+    window.deleteCat = async (id) => {
+      if (!confirm("确定要删除该分类吗？")) return;
+      try {
+        const res = await fetch(`/api/v1/admin/job-categories/${id}`, { method: 'DELETE', credentials: "include" });
+        const data = await parseApi(res);
+        if (!data.success) alert(data.message || "删除失败");
+        else loadCategories();
+      } catch (err) { alert("网络错误"); }
+    };
+
+    // Load Jobs
+    async function loadJobs(page = 0) {
+      try {
+        const res = await fetch(`/api/v1/admin/jobs?page=${page}&size=10`, { credentials: "include" });
+        const data = await parseApi(res);
+        if (res.status === 401 || res.status === 403) {
+          return;
+        }
+        if (!data.success) return;
+        
+        const pageData = data.data;
+        currentJobPage = pageData.page;
+        const tbody = document.getElementById('job-tbody');
+
+        if (pageData.content.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted)">暂无职位</td></tr>';
+        } else {
+          tbody.innerHTML = pageData.content.map(job => `
+            <tr>
+              <td>${job.id}</td>
+              <td>${esc(job.title)}</td>
+              <td>${esc(job.companyName)}</td>
+              <td>${job.recruiterUserId || '-'}</td>
+              <td><span class="badge ${job.status.toLowerCase()}">${esc(statusMap[job.status] || job.status)}</span></td>
+              <td>
+                <button class="btn-sm btn-out" onclick="editJob(${job.id})">编辑</button>
+                <button class="btn-sm btn-del" onclick="deleteJob(${job.id})">删除</button>
+              </td>
+            </tr>
+          `).join('');
+        }
+
+        document.getElementById('job-page-info').textContent = `第 ${pageData.page + 1} 页 / 共 ${pageData.totalPages} 页`;
+        document.getElementById('job-btn-prev').disabled = pageData.page === 0;
+        document.getElementById('job-btn-next').disabled = pageData.page >= pageData.totalPages - 1;
+      } catch (err) {}
+    }
+
+    // Job CRUD
+    document.getElementById('job-btn-prev').onclick = () => loadJobs(currentJobPage - 1);
+    document.getElementById('job-btn-next').onclick = () => loadJobs(currentJobPage + 1);
+
+    document.getElementById('btn-create-job').onclick = () => {
+      document.getElementById('job-form').reset();
+      document.getElementById('j-id').value = '';
+      document.getElementById('job-m-title').textContent = '新增职位';
+      document.getElementById('job-modal').classList.add('active');
+    };
+
+    window.editJob = async (id) => {
+      try {
+        const res = await fetch(`/api/v1/admin/jobs/${id}`, { credentials: "include" });
+        const data = await parseApi(res);
+        if (!data.success) { alert(data.message || "加载详情失败"); return; }
+        const job = data.data;
+        document.getElementById('j-id').value = job.id;
+        document.getElementById('j-recruiter').value = job.recruiterUserId || '';
+        document.getElementById('j-title').value = job.title;
+        document.getElementById('j-company').value = job.companyName;
+        document.getElementById('j-category').value = job.categoryId || '';
+        document.getElementById('j-work-type').value = job.workType;
+        document.getElementById('j-salary-min').value = job.salaryMin || '';
+        document.getElementById('j-salary-max').value = job.salaryMax || '';
+        document.getElementById('j-city').value = job.city || '';
+        document.getElementById('j-status').value = job.status;
+        document.getElementById('j-desc').value = job.description || '';
+        document.getElementById('job-m-title').textContent = '编辑职位';
+        document.getElementById('job-modal').classList.add('active');
+      } catch (err) { alert("网络错误"); }
+    };
+
+    document.getElementById('btn-save-job').onclick = async () => {
+      if (!document.getElementById('job-form').reportValidity()) return;
+      const id = document.getElementById('j-id').value;
+      const payload = {
+        recruiterUserId: parseInt(document.getElementById('j-recruiter').value),
+        title: document.getElementById('j-title').value,
+        companyName: document.getElementById('j-company').value,
+        categoryId: parseInt(document.getElementById('j-category').value) || null,
+        workType: document.getElementById('j-work-type').value,
+        salaryMin: parseInt(document.getElementById('j-salary-min').value) || null,
+        salaryMax: parseInt(document.getElementById('j-salary-max').value) || null,
+        city: document.getElementById('j-city').value,
+        status: document.getElementById('j-status').value,
+        description: document.getElementById('j-desc').value
+      };
+      try {
+        const res = await fetch(id ? `/api/v1/admin/jobs/${id}` : '/api/v1/admin/jobs', {
+          method: id ? 'PUT' : 'POST',
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await parseApi(res);
+        if (!data.success) alert(data.message || "保存失败");
+        else { closeModal('job-modal'); loadJobs(currentJobPage); }
+      } catch (err) { alert("网络错误"); }
+    };
+
+    window.deleteJob = async (id) => {
+      if (!confirm("确定要删除该职位吗？此操作不可恢复。")) return;
+      try {
+        const res = await fetch(`/api/v1/admin/jobs/${id}`, { method: 'DELETE', credentials: "include" });
+        const data = await parseApi(res);
+        if (!data.success) alert(data.message || "删除失败");
+        else loadJobs(currentJobPage);
+      } catch (err) { alert("网络错误"); }
+    };
+
+    window.closeModal = (id) => document.getElementById(id).classList.remove('active');
+
+    loadCategories().then(() => loadJobs());
+  </script>
+</body>
+</html>

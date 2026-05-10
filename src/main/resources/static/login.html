@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>登录 / 注册</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --text: #e6edf3;
+      --muted: #8b9cb3;
+      --accent: #58a6ff;
+      --danger: #f85149;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .wrap { width: 100%; max-width: 400px; }
+    h1 { font-size: 1.25rem; margin: 0 0 1rem; }
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .tabs button {
+      flex: 1;
+      padding: 0.5rem;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .tabs button.active { background: var(--card); color: var(--text); border-color: var(--accent); }
+    .card {
+      background: var(--card);
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+    label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 0.25rem; }
+    input {
+      width: 100%;
+      padding: 0.55rem 0.65rem;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      background: #0d1117;
+      color: var(--text);
+      margin-bottom: 0.85rem;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--accent); }
+    select {
+      width: 100%;
+      padding: 0.55rem 0.65rem;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      background: #0d1117;
+      color: var(--text);
+      margin-bottom: 0.85rem;
+    }
+    .submit {
+      width: 100%;
+      margin-top: 0.25rem;
+      padding: 0.65rem;
+      border: none;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #0f1419;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .submit:hover { filter: brightness(1.08); }
+    .msg { min-height: 1.25rem; font-size: 0.85rem; color: var(--danger); margin-bottom: 0.5rem; }
+    .nav { margin-top: 1rem; font-size: 0.88rem; }
+    .nav a { color: var(--accent); text-decoration: none; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .hint-login { font-size: 0.78rem; color: var(--muted); margin: -0.35rem 0 0.85rem; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>用户登录 / 注册</h1>
+    <div class="tabs">
+      <button type="button" class="active" data-tab="login">登录</button>
+      <button type="button" data-tab="register">注册</button>
+    </div>
+    <div class="card">
+      <div class="msg" id="msg"></div>
+
+      <div id="panel-login" class="panel active">
+        <form id="form-login">
+          <label for="l-user">用户名</label>
+          <input id="l-user" name="username" autocomplete="username" required minlength="3" maxlength="64" />
+          <label for="l-pass">密码</label>
+          <input id="l-pass" name="password" type="password" autocomplete="current-password" required minlength="6" maxlength="72" />
+          <label for="l-role">登录身份</label>
+          <select id="l-role" name="activeRole" required>
+            <option value="SEEKER">求职方</option>
+            <option value="RECRUITER">招聘方</option>
+            <option value="ADMIN">管理员</option>
+          </select>
+          <p class="hint-login">管理员账号需具备 ADMIN 角色（本地 profile 会预置 admin / admin123）。</p>
+          <button type="submit" class="submit">登录</button>
+        </form>
+      </div>
+
+      <div id="panel-register" class="panel">
+        <form id="form-register">
+          <label for="r-user">用户名</label>
+          <input id="r-user" name="username" autocomplete="username" required minlength="3" maxlength="64" />
+          <label for="r-pass">密码（至少 6 位）</label>
+          <input id="r-pass" name="password" type="password" autocomplete="new-password" required minlength="6" maxlength="72" />
+          <label for="r-email">邮箱（可选）</label>
+          <input id="r-email" name="email" type="email" maxlength="128" />
+          <label for="r-nick">昵称（可选）</label>
+          <input id="r-nick" name="nickname" maxlength="64" />
+          <label for="r-role">注册身份</label>
+          <select id="r-role" name="primaryRole" required>
+            <option value="SEEKER">求职方</option>
+            <option value="RECRUITER">招聘方</option>
+          </select>
+          <button type="submit" class="submit">注册并登录</button>
+        </form>
+      </div>
+    </div>
+    <p class="nav"><a href="/">返回首页</a> · <a href="/profile.html">个人信息</a></p>
+  </div>
+
+  <script>
+    const msg = document.getElementById("msg");
+    function showErr(t) { msg.textContent = t || ""; }
+    async function parseApi(res) {
+      const text = await res.text();
+      try { return JSON.parse(text); } catch { return { success: false, message: text || "请求失败" }; }
+    }
+
+    document.querySelectorAll(".tabs button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tabs button").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        const tab = btn.dataset.tab;
+        document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
+        document.getElementById("panel-" + tab).classList.add("active");
+        showErr("");
+      });
+    });
+
+    document.getElementById("form-login").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      showErr("");
+      const fd = new FormData(e.target);
+      const body = {
+        username: (fd.get("username") || "").toString().trim(),
+        password: (fd.get("password") || "").toString(),
+        activeRole: document.getElementById("l-role").value,
+      };
+      const res = await fetch("/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      const data = await parseApi(res);
+      if (!data.success) {
+        showErr(data.message || "登录失败");
+        return;
+      }
+      window.location.href = "/";
+    });
+
+    document.getElementById("form-register").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      showErr("");
+      const fd = new FormData(e.target);
+      const email = (fd.get("email") || "").toString().trim();
+      const nickname = (fd.get("nickname") || "").toString().trim();
+      const body = {
+        username: (fd.get("username") || "").toString().trim(),
+        password: (fd.get("password") || "").toString(),
+        email: email.length ? email : null,
+        nickname: nickname.length ? nickname : null,
+        primaryRole: document.getElementById("r-role").value,
+      };
+      const res = await fetch("/api/v1/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      const data = await parseApi(res);
+      if (!data.success) {
+        showErr(data.message || "注册失败");
+        return;
+      }
+      window.location.href = "/profile.html";
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>消息中心</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --text: #e6edf3;
+      --muted: #8b9cb3;
+      --accent: #58a6ff;
+      --danger: #f85149;
+      --border: #30363d;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; height: 100vh; display: flex; flex-direction: column; font-family: "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    .header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { font-size: 1.2rem; margin: 0; }
+    .nav a { color: var(--accent); text-decoration: none; margin-left: 1rem; font-size: 0.9rem; }
+    .main { display: flex; flex: 1; overflow: hidden; }
+    .sidebar { width: 300px; border-right: 1px solid var(--border); overflow-y: auto; background: #161b22; }
+    .chat-area { flex: 1; display: flex; flex-direction: column; background: var(--bg); }
+    
+    .session-item { padding: 1rem; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.2s; position: relative; }
+    .session-item:hover, .session-item.active { background: var(--card); }
+    .session-job { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.25rem; color: var(--text); padding-right: 1.5rem; }
+    .session-user { font-size: 0.8rem; color: var(--muted); }
+    .unread-dot {
+      position: absolute; right: 1rem; top: 1rem;
+      width: 10px; height: 10px; border-radius: 50%; background: var(--danger);
+      display: inline-block;
+    }
+    
+    .messages { flex: 1; padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; }
+    .msg-wrap { display: flex; flex-direction: column; max-width: 75%; }
+    .msg-wrap.mine { align-self: flex-end; align-items: flex-end; }
+    .msg-wrap.other { align-self: flex-start; align-items: flex-start; }
+    .msg-sender { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.2rem; }
+    .msg-bubble { padding: 0.75rem 1rem; border-radius: 12px; font-size: 0.95rem; line-height: 1.5; word-break: break-word; white-space: pre-wrap; }
+    .msg-wrap.mine .msg-bubble { background: var(--accent); color: #0f1419; border-bottom-right-radius: 2px; }
+    .msg-wrap.other .msg-bubble { background: var(--card); color: var(--text); border: 1px solid var(--border); border-bottom-left-radius: 2px; }
+    .msg-file a { color: inherit; text-decoration: underline; font-weight: 600; }
+    
+    .job-card { background: #0d1117; border: 1px solid var(--accent); border-radius: 8px; padding: 1rem; width: 250px; cursor: pointer; transition: filter 0.2s; margin-top: 0.25rem; }
+    .job-card:hover { filter: brightness(1.2); }
+    .job-card h4 { margin: 0 0 0.5rem; font-size: 1rem; color: var(--accent); }
+    .job-card p { margin: 0.25rem 0; font-size: 0.85rem; color: var(--muted); }
+    .job-card .salary { color: var(--ok); font-weight: 600; }
+    
+    .input-area { padding: 1rem; border-top: 1px solid var(--border); background: #161b22; display: flex; gap: 0.5rem; align-items: center; }
+    .input-area textarea { flex: 1; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: #0d1117; color: var(--text); resize: none; font-family: inherit; font-size: 0.95rem; height: 3rem; }
+    .input-area textarea:focus { outline: none; border-color: var(--accent); }
+    .btn-send { padding: 0 1.5rem; height: 3rem; border-radius: 8px; border: none; background: var(--accent); color: #0f1419; font-weight: 600; cursor: pointer; }
+    .btn-send:hover { filter: brightness(1.1); }
+    .btn-file { padding: 0 1rem; height: 3rem; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .btn-file:hover { color: var(--text); border-color: var(--muted); }
+    
+    #empty-state { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 1.1rem; }
+    .unauth-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 3rem 2rem;
+      text-align: center;
+      margin: auto;
+    }
+    .unauth-card h2 { margin: 0 0 1rem; color: var(--text); }
+    .unauth-card p { color: var(--muted); margin: 0 0 2rem; }
+    .unauth-card a {
+      display: inline-block;
+      padding: 0.6rem 1.5rem;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #0f1419;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .unauth-card a:hover { filter: brightness(1.1); }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>消息中心</h1>
+    <div class="nav"><a href="/">返回首页</a></div>
+  </div>
+  
+  <div class="main">
+    <div class="sidebar" id="session-list">
+      <!-- 会话列表 -->
+    </div>
+    
+    <div class="chat-area" id="chat-area" style="display: none;">
+      <div class="messages" id="messages-container"></div>
+      <div class="input-area">
+        <input type="file" id="file-input" style="display: none;" />
+        <button type="button" class="btn-file" id="btn-upload" title="上传文档">📎</button>
+        <textarea id="msg-input" placeholder="输入消息..."></textarea>
+        <button type="button" class="btn-send" id="btn-send">发送</button>
+      </div>
+    </div>
+    <div id="empty-state">请选择左侧会话开始聊天</div>
+  </div>
+
+  <script>
+    const sessionListEl = document.getElementById('session-list');
+    const chatArea = document.getElementById('chat-area');
+    const emptyState = document.getElementById('empty-state');
+    const messagesContainer = document.getElementById('messages-container');
+    const msgInput = document.getElementById('msg-input');
+    const btnSend = document.getElementById('btn-send');
+    const btnUpload = document.getElementById('btn-upload');
+    const fileInput = document.getElementById('file-input');
+
+    let currentUserId = null;
+    let currentSessionId = null;
+
+    async function parseApi(res) {
+      const text = await res.text();
+      try { return JSON.parse(text); } catch { return { success: false, message: text || "请求失败" }; }
+    }
+    function esc(s) {
+      if (s == null) return "";
+      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    async function init() {
+      // Get current user
+      const meRes = await fetch('/api/v1/auth/me', { credentials: "include" });
+      const meData = await parseApi(meRes);
+      if (!meData.success) {
+        sessionListEl.style.display = 'none';
+        chatArea.style.display = 'none';
+        emptyState.style.display = 'none';
+        
+        const unauthDiv = document.createElement('div');
+        unauthDiv.className = 'unauth-card';
+        unauthDiv.innerHTML = `
+          <h2>需要登录</h2>
+          <p>请先登录后查看您的消息记录</p>
+          <a href="/login.html">前往登录 / 注册</a>
+        `;
+        document.querySelector('.main').appendChild(unauthDiv);
+        return;
+      }
+      currentUserId = meData.data.id;
+
+      await loadSessions();
+    }
+
+    async function loadSessions() {
+      const res = await fetch('/api/v1/chat/sessions', { credentials: "include" });
+      const data = await parseApi(res);
+      if (!data.success) return;
+
+      sessionListEl.innerHTML = '';
+      if (data.data.length === 0) {
+        sessionListEl.innerHTML = '<div style="padding:1rem;color:var(--muted);text-align:center;">暂无消息记录</div>';
+        return;
+      }
+
+      data.data.forEach(s => {
+        const div = document.createElement('div');
+        div.className = 'session-item';
+        div.id = `session-${s.id}`;
+        const otherName = currentUserId === s.seekerUserId ? s.recruiterName : s.seekerName;
+        const roleLabel = currentUserId === s.seekerUserId ? '招聘者' : '求职者';
+        
+        const unreadHtml = s.unreadCount > 0 ? `<span class="unread-dot" id="dot-${s.id}"></span>` : '';
+        
+        div.innerHTML = `
+          ${unreadHtml}
+          <div class="session-job">${esc(s.jobTitle)}</div>
+          <div class="session-user">${esc(otherName)} (${roleLabel})</div>
+        `;
+        div.onclick = () => {
+          document.querySelectorAll('.session-item').forEach(el => el.classList.remove('active'));
+          div.classList.add('active');
+          const dot = document.getElementById(`dot-${s.id}`);
+          if (dot) dot.remove();
+          openSession(s.id);
+        };
+        sessionListEl.appendChild(div);
+      });
+    }
+
+    async function openSession(sessionId) {
+      currentSessionId = sessionId;
+      emptyState.style.display = 'none';
+      chatArea.style.display = 'flex';
+      messagesContainer.innerHTML = '<div style="text-align:center;color:var(--muted);margin-top:2rem;">加载中...</div>';
+      
+      // Mark as read
+      try {
+        await fetch(`/api/v1/chat/sessions/${sessionId}/read`, { method: 'POST', credentials: "include" });
+      } catch (e) {}
+
+      await loadMessages();
+    }
+
+    async function loadMessages() {
+      if (!currentSessionId) return;
+      const res = await fetch(`/api/v1/chat/sessions/${currentSessionId}/messages`, { credentials: "include" });
+      const data = await parseApi(res);
+      if (!data.success) return;
+
+      messagesContainer.innerHTML = '';
+      data.data.forEach(m => appendMessage(m));
+      scrollToBottom();
+    }
+
+    function appendMessage(m) {
+      const isMine = m.senderUserId === currentUserId;
+      const wrap = document.createElement('div');
+      wrap.className = `msg-wrap ${isMine ? 'mine' : 'other'}`;
+      
+      let contentHtml = esc(m.content);
+      if (m.msgType === 'FILE') {
+        contentHtml = `📄 <a href="${esc(m.content)}" target="_blank" class="msg-file">查看附件</a>`;
+      } else if (m.msgType === 'RESUME') {
+        contentHtml = `<strong>[在线简历]</strong>\n${esc(m.content)}`;
+      } else if (m.msgType === 'JOB_INVITE') {
+        try {
+          const job = JSON.parse(m.content);
+          contentHtml = `
+            <div>您好！我对您的简历很感兴趣，诚邀您投递我们的职位。点击下方卡片查看详情：</div>
+            <div class="job-card" onclick="window.location.href='/seeker-jobs.html?jobId=${job.jobId}'">
+              <h4>${esc(job.title)}</h4>
+              <p>${esc(job.company)}</p>
+              <p><span class="salary">${esc(job.salary)}</span> · ${esc(job.city)}</p>
+            </div>
+          `;
+        } catch(e) {
+          contentHtml = '[职位邀请 解析失败]';
+        }
+      }
+
+      wrap.innerHTML = `
+        <div class="msg-sender">${isMine ? '我' : esc(m.senderName)}</div>
+        <div class="msg-bubble">${contentHtml}</div>
+      `;
+      messagesContainer.appendChild(wrap);
+    }
+
+    function scrollToBottom() {
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    btnSend.onclick = async () => {
+      const text = msgInput.value.trim();
+      if (!text || !currentSessionId) return;
+      msgInput.disabled = true;
+      btnSend.disabled = true;
+
+      try {
+        const res = await fetch(`/api/v1/chat/sessions/${currentSessionId}/messages`, {
+          method: 'POST',
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ msgType: 'TEXT', content: text })
+        });
+        const data = await parseApi(res);
+        if (data.success) {
+          msgInput.value = '';
+          appendMessage(data.data);
+          scrollToBottom();
+        } else {
+          alert(data.message || "发送失败");
+        }
+      } catch (err) {}
+      
+      msgInput.disabled = false;
+      btnSend.disabled = false;
+      msgInput.focus();
+    };
+
+    btnUpload.onclick = () => fileInput.click();
+
+    fileInput.onchange = async () => {
+      if (!fileInput.files.length || !currentSessionId) return;
+      const file = fileInput.files[0];
+      const fd = new FormData();
+      fd.append('file', file);
+      
+      btnUpload.disabled = true;
+      try {
+        const uploadRes = await fetch('/api/v1/files/upload', {
+          method: 'POST',
+          credentials: "include",
+          body: fd
+        });
+        const uploadData = await parseApi(uploadRes);
+        if (uploadData.success) {
+          // 发送文件消息
+          const res = await fetch(`/api/v1/chat/sessions/${currentSessionId}/messages`, {
+            method: 'POST',
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ msgType: 'FILE', content: uploadData.data })
+          });
+          const data = await parseApi(res);
+          if (data.success) {
+            appendMessage(data.data);
+            scrollToBottom();
+          }
+        } else {
+          alert(uploadData.message || "上传失败");
+        }
+      } catch (err) {
+        alert("网络错误");
+      }
+      fileInput.value = '';
+      btnUpload.disabled = false;
+    };
+
+    msgInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        btnSend.click();
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

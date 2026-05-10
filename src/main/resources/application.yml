@@ -1,0 +1,52 @@
+# 默认连接本机 MySQL（localhost:3306 / 库名 job_ai）。
+# 若报错 Communications link failure / Connection refused：说明当前连不上 MySQL（服务未启动、端口不对或防火墙）。
+# 处理：启动 MySQL 并执行 CREATE DATABASE job_ai; 且用户名密码与下方一致；或改用内存库 profile：local（见 application-local.yml）。
+spring:
+  application:
+    name: job-ai-automation
+  datasource:
+    url: jdbc:mysql://localhost:3306/job_ai?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: root123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: Asia/Shanghai
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always
+
+# TODO: AI 服务、第三方招聘平台 API、消息队列等配置项后续在此补充
+
+ai:
+  openai:
+    api-key: sk-90be84e8e3054616ad876d37f949be54
+    model: qwen-plus
+    model.parse: qwen-plus
+    model.optimize: qwen-plus
+    model.user-agent: qwen3.6-flash
+    model.preference-agent: deepseek-v3.2
+    model.advice-agent: qwen3.6-plus
+    model.common-agent: kimi-k2.6
+    base-url: https://dashscope.aliyuncs.com/compatible-mode
+    connect-timeout: 30000
+    read-timeout: 60000

@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>招聘者 - 职位管理</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --text: #e6edf3;
+      --muted: #8b9cb3;
+      --accent: #58a6ff;
+      --danger: #f85149;
+      --ok: #3fb950;
+      --warn: #d29922;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; font-family: "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 1.75rem 1.25rem; }
+    .wrap { max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 1.35rem; margin: 0 0 1rem; display: flex; justify-content: space-between; align-items: center; }
+    .nav { margin-bottom: 1.25rem; font-size: 0.9rem; }
+    .nav a { color: var(--accent); text-decoration: none; margin-right: 0.5rem; }
+    .nav a:hover { text-decoration: underline; }
+    .job-card { background: var(--card); border: 1px solid #30363d; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+    .job-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; }
+    .job-title { font-size: 1.1rem; font-weight: 600; margin: 0; color: var(--accent); }
+    .job-meta { font-size: 0.85rem; color: var(--muted); display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .badge { font-size: 0.75rem; font-weight: 700; padding: 0.15rem 0.4rem; border-radius: 4px; background: #30363d; color: var(--text); }
+    .badge.published { background: rgba(63, 185, 80, 0.2); color: var(--ok); }
+    .badge.withdrawn { background: rgba(210, 153, 34, 0.2); color: var(--warn); }
+    .badge.draft { background: rgba(139, 156, 179, 0.2); color: var(--muted); }
+    .actions { display: flex; gap: 0.5rem; }
+    button { padding: 0.4rem 0.8rem; border-radius: 6px; border: none; background: var(--accent); color: #0f1419; font-weight: 600; cursor: pointer; font-size: 0.85rem; }
+    button:hover { filter: brightness(1.1); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-out { background: #30363d; color: var(--text); }
+    .btn-del { background: rgba(248, 81, 73, 0.2); color: var(--danger); border: 1px solid var(--danger); }
+    .btn-warn { background: rgba(210, 153, 34, 0.2); color: var(--warn); border: 1px solid var(--warn); }
+    .btn-invite { background: rgba(88, 166, 255, 0.2); color: var(--accent); border: 1px solid var(--accent); }
+    .pagination { display: flex; justify-content: space-between; margin-top: 1rem; align-items: center; font-size: 0.85rem; }
+    .loading { color: var(--muted); }
+    .msg { font-size: 0.85rem; color: var(--danger); margin-bottom: 1rem; }
+    .unauth-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 3rem 2rem;
+      text-align: center;
+    }
+    .unauth-card h2 { margin: 0 0 1rem; color: var(--text); }
+    .unauth-card p { color: var(--muted); margin: 0 0 2rem; }
+    .unauth-card a {
+      display: inline-block;
+      padding: 0.6rem 1.5rem;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #0f1419;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .unauth-card a:hover { filter: brightness(1.1); }
+
+    /* Form Modal */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; padding: 1rem; z-index: 100; }
+    .modal-overlay.active { display: flex; }
+    .modal { background: var(--bg); border: 1px solid #30363d; border-radius: 12px; width: 100%; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; }
+    .modal-header { padding: 1.25rem; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; }
+    .modal-title { font-size: 1.2rem; font-weight: 600; margin: 0; }
+    .btn-close { background: transparent; color: var(--muted); font-size: 1.5rem; padding: 0; line-height: 1; margin: 0; }
+    .btn-close:hover { color: var(--text); background: transparent; }
+    .modal-body { padding: 1.25rem; overflow-y: auto; }
+    .modal-footer { padding: 1.25rem; border-top: 1px solid #30363d; display: flex; justify-content: flex-end; gap: 0.5rem; }
+    
+    label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 0.25rem; margin-top: 0.85rem; }
+    input, select, textarea { width: 100%; padding: 0.55rem 0.65rem; border-radius: 8px; border: 1px solid #30363d; background: #0d1117; color: var(--text); font-family: inherit; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+    .form-row { display: flex; gap: 1rem; }
+    .form-row > div { flex: 1; }
+
+    .candidate-card { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; margin-bottom: 0.75rem; }
+    .candidate-card h3 { margin: 0 0 0.5rem; font-size: 1.05rem; display: flex; justify-content: space-between; }
+    .candidate-card p { margin: 0.25rem 0; font-size: 0.85rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>
+      <span>招聘者 - 职位管理</span>
+      <button id="btn-create">发布新职位</button>
+    </h1>
+    <p class="nav">
+      <a href="/">返回首页</a> · 
+      <a href="/records.html">处理记录</a> · 
+      <a href="/messages.html" id="btn-msg">消息中心</a>
+    </p>
+    <div id="msg" class="msg"></div>
+    <div id="loading" class="loading">加载中...</div>
+    <div id="job-list"></div>
+    <div class="pagination" id="pagination" style="display: none;">
+      <button id="btn-prev">上一页</button>
+      <span id="page-info"></span>
+      <button id="btn-next">下一页</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="m-title">发布新职位</h2>
+        <button class="btn-close" id="btn-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="job-form">
+          <input type="hidden" id="f-id" />
+          <label>职位名称</label>
+          <input type="text" id="f-title" required maxlength="255" />
+          <label>公司名称</label>
+          <input type="text" id="f-company" required maxlength="255" />
+          <div class="form-row">
+            <div>
+              <label>职位分类</label>
+              <select id="f-category"></select>
+            </div>
+            <div>
+              <label>工作类型</label>
+              <select id="f-work-type">
+                <option value="FULL_TIME">全职</option>
+                <option value="PART_TIME">兼职</option>
+                <option value="CONTRACT">合同工</option>
+                <option value="INTERNSHIP">实习</option>
+                <option value="REMOTE">远程</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div>
+              <label>最低薪资</label>
+              <input type="number" id="f-salary-min" placeholder="例如: 10000" />
+            </div>
+            <div>
+              <label>最高薪资</label>
+              <input type="number" id="f-salary-max" placeholder="例如: 20000" />
+            </div>
+          </div>
+          <label>工作城市</label>
+          <input type="text" id="f-city" maxlength="128" placeholder="全国" />
+          <label>职位状态</label>
+          <select id="f-status">
+            <option value="PUBLISHED">发布</option>
+            <option value="DRAFT">草稿</option>
+            <option value="WITHDRAWN">下架</option>
+          </select>
+          <label>职位描述</label>
+          <textarea id="f-desc" rows="5" required></textarea>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-out" id="btn-cancel">取消</button>
+        <button type="button" id="btn-save">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="invite-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">邀请投递</h2>
+        <button class="btn-close" onclick="document.getElementById('invite-modal').classList.remove('active')">&times;</button>
+      </div>
+      <div class="modal-body" id="candidates-list">
+        <div class="loading">加载中...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const jobListEl = document.getElementById('job-list');
+    const msgEl = document.getElementById('msg');
+    const loadingEl = document.getElementById('loading');
+    const paginationEl = document.getElementById('pagination');
+    const btnPrev = document.getElementById('btn-prev');
+    const btnNext = document.getElementById('btn-next');
+    const pageInfo = document.getElementById('page-info');
+
+    const modal = document.getElementById('modal');
+    const btnClose = document.getElementById('btn-close');
+    const btnCancel = document.getElementById('btn-cancel');
+    const btnSave = document.getElementById('btn-save');
+    const btnCreate = document.getElementById('btn-create');
+
+    let currentPage = 0;
+    let categories = [];
+
+    async function parseApi(res) {
+      const text = await res.text();
+      try { return JSON.parse(text); } catch { return { success: false, message: text || "请求失败" }; }
+    }
+    function esc(s) {
+      if (s == null) return "";
+      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    const statusMap = { DRAFT: '草稿', PUBLISHED: '已发布', WITHDRAWN: '已下架' };
+    const workTypeMap = { FULL_TIME: '全职', PART_TIME: '兼职', CONTRACT: '合同工', INTERNSHIP: '实习', REMOTE: '远程' };
+
+    async function loadCategories() {
+      try {
+        const res = await fetch("/api/v1/recruiter/job-categories", { credentials: "include" });
+        const data = await parseApi(res);
+        if (data.success) {
+          categories = data.data;
+          const sel = document.getElementById('f-category');
+          sel.innerHTML = categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+        }
+      } catch (err) {}
+    }
+
+    async function loadJobs(page = 0) {
+      loadingEl.style.display = 'block';
+      jobListEl.innerHTML = '';
+      msgEl.textContent = '';
+      paginationEl.style.display = 'none';
+
+      try {
+        const res = await fetch(`/api/v1/recruiter/jobs?page=${page}&size=10`, { credentials: "include" });
+        const data = await parseApi(res);
+        if (res.status === 401 || res.status === 403) {
+          jobListEl.innerHTML = `
+            <div class="unauth-card">
+              <h2>需要登录</h2>
+              <p>请先以招聘者身份登录后管理职位</p>
+              <a href="/login.html">前往登录 / 注册</a>
+            </div>
+          `;
+          loadingEl.style.display = 'none';
+          document.getElementById('btn-create').style.display = 'none';
+          return;
+        }
+        if (!data.success) {
+          msgEl.textContent = data.message || "加载失败";
+          loadingEl.style.display = 'none';
+          return;
+        }
+
+        const pageData = data.data;
+        currentPage = pageData.page;
+
+        if (pageData.content.length === 0) {
+          jobListEl.innerHTML = '<p style="color: var(--muted);">您还没有发布任何职位</p>';
+        } else {
+          pageData.content.forEach(job => {
+            const card = document.createElement('div');
+            card.className = 'job-card';
+            card.innerHTML = `
+              <div class="job-header">
+                <h3 class="job-title">${esc(job.title)} <span class="badge ${job.status.toLowerCase()}">${esc(statusMap[job.status] || job.status)}</span></h3>
+              </div>
+              <div class="job-meta">
+                <span>${esc(job.companyName)}</span>
+                <span>${esc(job.city || '全国')}</span>
+                <span>${esc(workTypeMap[job.workType] || job.workType)}</span>
+                <span>${esc(job.categoryName || '未知分类')}</span>
+              </div>
+              <div class="actions">
+                <button type="button" class="btn-out" onclick="editJob(${job.id})">编辑</button>
+                ${job.status === 'PUBLISHED' ? `
+                  <button type="button" class="btn-warn" onclick="withdrawJob(${job.id})">下架</button>
+                  <button type="button" class="btn-invite" onclick="openInviteModal(${job.id})">邀请投递</button>
+                ` : ''}
+              </div>
+            `;
+            jobListEl.appendChild(card);
+          });
+        }
+
+        pageInfo.textContent = `第 ${pageData.page + 1} 页 / 共 ${pageData.totalPages} 页`;
+        btnPrev.disabled = pageData.page === 0;
+        btnNext.disabled = pageData.page >= pageData.totalPages - 1;
+        paginationEl.style.display = 'flex';
+      } catch (err) {
+        msgEl.textContent = "网络错误";
+      }
+      loadingEl.style.display = 'none';
+    }
+
+    async function withdrawJob(id) {
+      if (!confirm("确定要下架该职位吗？")) return;
+      try {
+        const res = await fetch(`/api/v1/recruiter/jobs/${id}/withdraw`, { method: 'POST', credentials: "include" });
+        const data = await parseApi(res);
+        if (!data.success) alert(data.message || "下架失败");
+        else loadJobs(currentPage);
+      } catch (err) { alert("网络错误"); }
+    }
+
+    async function editJob(id) {
+      try {
+        const res = await fetch(`/api/v1/recruiter/jobs/${id}`, { credentials: "include" });
+        const data = await parseApi(res);
+        if (!data.success) { alert(data.message || "加载详情失败"); return; }
+        const job = data.data;
+        document.getElementById('m-title').textContent = '编辑职位';
+        document.getElementById('f-id').value = job.id;
+        document.getElementById('f-title').value = job.title;
+        document.getElementById('f-company').value = job.companyName;
+        document.getElementById('f-category').value = job.categoryId || '';
+        document.getElementById('f-work-type').value = job.workType;
+        document.getElementById('f-salary-min').value = job.salaryMin || '';
+        document.getElementById('f-salary-max').value = job.salaryMax || '';
+        document.getElementById('f-city').value = job.city || '';
+        document.getElementById('f-status').value = job.status;
+        document.getElementById('f-desc').value = job.description || '';
+        modal.classList.add('active');
+      } catch (err) { alert("网络错误"); }
+    }
+
+    btnCreate.onclick = () => {
+      document.getElementById('job-form').reset();
+      document.getElementById('m-title').textContent = '发布新职位';
+      document.getElementById('f-id').value = '';
+      modal.classList.add('active');
+    };
+
+    btnSave.onclick = async () => {
+      const form = document.getElementById('job-form');
+      if (!form.reportValidity()) return;
+      btnSave.disabled = true;
+      const id = document.getElementById('f-id').value;
+      const payload = {
+        title: document.getElementById('f-title').value,
+        companyName: document.getElementById('f-company').value,
+        categoryId: parseInt(document.getElementById('f-category').value) || null,
+        workType: document.getElementById('f-work-type').value,
+        salaryMin: parseInt(document.getElementById('f-salary-min').value) || null,
+        salaryMax: parseInt(document.getElementById('f-salary-max').value) || null,
+        city: document.getElementById('f-city').value,
+        status: document.getElementById('f-status').value,
+        description: document.getElementById('f-desc').value
+      };
+      try {
+        const url = id ? `/api/v1/recruiter/jobs/${id}` : `/api/v1/recruiter/jobs`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+          method,
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await parseApi(res);
+        if (!data.success) alert(data.message || "保存失败");
+        else {
+          modal.classList.remove('active');
+          loadJobs(currentPage);
+        }
+      } catch (err) { alert("网络错误"); }
+      btnSave.disabled = false;
+    };
+
+    btnClose.onclick = btnCancel.onclick = () => modal.classList.remove('active');
+    btnPrev.onclick = () => loadJobs(currentPage - 1);
+    btnNext.onclick = () => loadJobs(currentPage + 1);
+
+    async function openInviteModal(jobId) {
+      const inviteModal = document.getElementById('invite-modal');
+      const listEl = document.getElementById('candidates-list');
+      inviteModal.classList.add('active');
+      listEl.innerHTML = '<div class="loading">加载候选人中...</div>';
+
+      try {
+        const res = await fetch('/api/v1/resumes/list-for-recruiter', { credentials: "include" });
+        const data = await parseApi(res);
+        if (!data.success) {
+          listEl.innerHTML = `<div class="msg">${esc(data.message || "加载失败")}</div>`;
+          return;
+        }
+
+        if (data.data.length === 0) {
+          listEl.innerHTML = '<div style="color:var(--muted); text-align:center;">暂无求职者简历</div>';
+          return;
+        }
+
+        listEl.innerHTML = data.data.map(r => `
+          <div class="candidate-card">
+            <h3>
+              ${esc(r.name)}
+              <button type="button" class="btn-sm btn-invite" onclick="inviteCandidate(${jobId}, ${r.userId}, this)">发送邀请</button>
+            </h3>
+            <p><strong>个人信息：</strong> ${esc(r.personalInfo || '未填写')}</p>
+            <p><strong>求职状态：</strong> ${esc(r.jobStatus || '未填写')}</p>
+            <p><strong>教育经历：</strong> ${esc(r.education || '未填写')}</p>
+          </div>
+        `).join('');
+      } catch (err) {
+        listEl.innerHTML = '<div class="msg">网络错误</div>';
+      }
+    }
+
+    async function inviteCandidate(jobId, seekerId, btn) {
+      btn.disabled = true;
+      btn.textContent = '邀请中...';
+      try {
+        const res = await fetch(`/api/v1/chat/invite?jobId=${jobId}&seekerUserId=${seekerId}`, {
+          method: 'POST',
+          credentials: "include"
+        });
+        const data = await parseApi(res);
+        if (!data.success) {
+          alert(data.message || "邀请失败");
+          btn.disabled = false;
+          btn.textContent = '发送邀请';
+        } else {
+          btn.textContent = '已邀请';
+          btn.style.background = 'rgba(63, 185, 80, 0.2)';
+          btn.style.color = 'var(--ok)';
+          btn.style.borderColor = 'var(--ok)';
+        }
+      } catch (err) {
+        alert("网络错误");
+        btn.disabled = false;
+        btn.textContent = '发送邀请';
+      }
+    }
+
+    // 检查未读消息
+    async function checkUnread() {
+      try {
+        const ur = await fetch('/api/v1/chat/unread-count', { credentials: "include" });
+        const urData = await parseApi(ur);
+        if (urData.success && urData.data > 0) {
+          const btnMsg = document.getElementById('btn-msg');
+          if (btnMsg) {
+            btnMsg.innerHTML = `消息中心 <span style="display:inline-block;width:8px;height:8px;background:var(--danger);border-radius:50%;margin-left:2px;"></span>`;
+          }
+        }
+      } catch (e) {}
+    }
+
+    loadCategories().then(() => loadJobs()).then(checkUnread);
+  </script>
+</body>
+</html>

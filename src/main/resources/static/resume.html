@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>我的简历</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --text: #e6edf3;
+      --muted: #8b9cb3;
+      --accent: #58a6ff;
+      --danger: #f85149;
+      --ok: #3fb950;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; font-family: "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 1.75rem 1.25rem; }
+    .wrap { max-width: 700px; margin: 0 auto; }
+    h1 { font-size: 1.35rem; margin: 0 0 1rem; }
+    .nav { margin-bottom: 1.25rem; font-size: 0.9rem; }
+    .nav a { color: var(--accent); text-decoration: none; margin-right: 0.5rem; }
+    .nav a:hover { text-decoration: underline; }
+    .card { background: var(--card); border: 1px solid #30363d; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.4rem; margin-top: 1rem; }
+    input, textarea { width: 100%; padding: 0.65rem; border-radius: 8px; border: 1px solid #30363d; background: #0d1117; color: var(--text); font-family: inherit; font-size: 0.95rem; }
+    input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+    button { padding: 0.6rem 1.2rem; border-radius: 6px; border: none; background: var(--accent); color: #0f1419; font-weight: 600; cursor: pointer; font-size: 0.95rem; margin-top: 1.5rem; }
+    button:hover { filter: brightness(1.1); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .msg { font-size: 0.85rem; color: var(--danger); margin-top: 1rem; min-height: 1.2rem; }
+    .msg.success { color: var(--ok); }
+    .loading { color: var(--muted); }
+    .unauth-card {
+      background: var(--card);
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 3rem 2rem;
+      text-align: center;
+    }
+    .unauth-card h2 { margin: 0 0 1rem; color: var(--text); }
+    .unauth-card p { color: var(--muted); margin: 0 0 2rem; }
+    .unauth-card a {
+      display: inline-block;
+      padding: 0.6rem 1.5rem;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #0f1419;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .unauth-card a:hover { filter: brightness(1.1); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>我的简历 (求职者)</h1>
+    <p class="nav"><a href="/">返回首页</a> · <a href="/seeker-jobs.html">去投递职位</a></p>
+    
+    <div id="loading" class="loading">加载中...</div>
+    <div id="unauth-container"></div>
+    
+    <div class="card" id="resume-form-container" style="display: none;">
+      <form id="resume-form">
+        <label for="r-name">简历名称 <span style="color:var(--danger)">*</span></label>
+        <input type="text" id="r-name" placeholder="例如：前端开发工程师-张三" required maxlength="128" />
+        
+        <label for="r-personal">个人信息</label>
+        <textarea id="r-personal" rows="3" placeholder="例如：张三，男，25岁，邮箱，电话..."></textarea>
+        
+        <label for="r-status">求职状态</label>
+        <input type="text" id="r-status" placeholder="例如：离职-随时到岗，在职-考虑机会..." maxlength="64" />
+        
+        <label for="r-edu">教育经历</label>
+        <textarea id="r-edu" rows="4" placeholder="例如：2016.09 - 2020.06 某某大学 计算机科学与技术 本科"></textarea>
+        
+        <label for="r-work">工作经历</label>
+        <textarea id="r-work" rows="6" placeholder="请详细描述您的工作经历..."></textarea>
+        
+        <label for="r-project">项目经历</label>
+        <textarea id="r-project" rows="6" placeholder="请详细描述您的项目经历..."></textarea>
+        
+        <button type="submit" id="btn-save">保存简历</button>
+        <button type="button" id="btn-parse">简历解析</button>
+        <button type="button" id="btn-optimize">简历优化</button>
+        <button type="button" id="btn-cancel" style="display: none; background: var(--danger);">取消解析</button>
+        <input type="file" id="file-input" style="display: none;" accept=".pdf,.doc,.docx,.txt" />
+
+        <div id="msg" class="msg"></div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const formContainer = document.getElementById('resume-form-container');
+    const loadingEl = document.getElementById('loading');
+    const msgEl = document.getElementById('msg');
+    const btnSave = document.getElementById('btn-save');
+    const btnParse = document.getElementById('btn-parse');
+    const btnOptimize = document.getElementById('btn-optimize');
+    const btnCancel = document.getElementById('btn-cancel');
+    const fileInput = document.getElementById('file-input');
+    const form = document.getElementById('resume-form');
+    
+    const rName = document.getElementById('r-name');
+    const rPersonal = document.getElementById('r-personal');
+    const rStatus = document.getElementById('r-status');
+    const rEdu = document.getElementById('r-edu');
+    const rWork = document.getElementById('r-work');
+    const rProject = document.getElementById('r-project');
+
+    async function parseApi(res) {
+      const text = await res.text();
+      try { return JSON.parse(text); } catch { return { success: false, message: text || "请求失败" }; }
+    }
+
+    async function loadResume() {
+      try {
+        const res = await fetch("/api/v1/resumes/me", { credentials: "include" });
+        const data = await parseApi(res);
+        
+        if (res.status === 401 || res.status === 403) {
+          loadingEl.style.display = 'none';
+          document.getElementById('unauth-container').innerHTML = `
+            <div class="unauth-card">
+              <h2>需要登录</h2>
+              <p>请先以求职者身份登录后编写您的简历</p>
+              <a href="/login.html">前往登录 / 注册</a>
+            </div>
+          `;
+          return;
+        }
+        
+        if (data.success && data.data) {
+          rName.value = data.data.name || '';
+          rPersonal.value = data.data.personalInfo || '';
+          rStatus.value = data.data.jobStatus || '';
+          rEdu.value = data.data.education || '';
+          rWork.value = data.data.workExperience || '';
+          rProject.value = data.data.projectExperience || '';
+        }
+        
+        loadingEl.style.display = 'none';
+        formContainer.style.display = 'block';
+      } catch (err) {
+        loadingEl.textContent = "加载失败，网络错误";
+      }
+    }
+
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      msgEl.textContent = '';
+      msgEl.className = 'msg';
+      btnSave.disabled = true;
+      btnSave.textContent = '保存中...';
+
+      const payload = {
+        name: rName.value.trim(),
+        personalInfo: rPersonal.value.trim(),
+        jobStatus: rStatus.value.trim(),
+        education: rEdu.value.trim(),
+        workExperience: rWork.value.trim(),
+        projectExperience: rProject.value.trim()
+      };
+
+      try {
+        const res = await fetch("/api/v1/resumes/me", {
+          method: 'POST',
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await parseApi(res);
+        if (!data.success) {
+          msgEl.textContent = data.message || "保存失败";
+        } else {
+          msgEl.textContent = "保存成功！";
+          msgEl.className = 'msg success';
+        }
+      } catch (err) {
+        msgEl.textContent = "网络错误";
+      }
+      
+      btnSave.disabled = false;
+      btnSave.textContent = '保存简历';
+    };
+
+    loadResume();
+
+    btnParse.onclick = () => {
+      fileInput.click();
+    };
+
+    fileInput.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      // 显示加载状态
+      msgEl.textContent = '开始解析简历...';
+      msgEl.className = 'msg loading';
+      btnParse.disabled = true;
+      btnParse.textContent = '解析中...';
+      btnCancel.style.display = 'inline-block';
+      btnCancel.disabled = false;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // 创建 AbortController 用于取消请求
+      const controller = new AbortController();
+      const signal = controller.signal;
+
+      // 取消按钮事件
+      btnCancel.onclick = () => {
+        controller.abort();
+        msgEl.textContent = '解析已取消';
+        msgEl.className = 'msg';
+        btnParse.disabled = false;
+        btnParse.textContent = '简历解析';
+        btnCancel.style.display = 'none';
+      };
+
+      try {
+        const res = await fetch('/api/v1/resumes/parse', {
+          method: 'POST',
+          credentials: 'include',
+          body: formData,
+          signal
+        });
+        const data = await parseApi(res);
+        if (data.success) {
+          const parsed = data.data;
+          const confirmed = confirm(`解析结果：\n姓名：${parsed.name}\n个人信息：${parsed.personalInfo}\n教育经历：${parsed.education}\n求职状态：${parsed.jobStatus}\n工作经历：${parsed.workExperience}\n项目经历：${parsed.projectExperience}\n\n是否保留并填入表单？`);
+          if (confirmed) {
+            rName.value = parsed.name || '';
+            rPersonal.value = parsed.personalInfo || '';
+            rEdu.value = parsed.education || '';
+            rStatus.value = parsed.jobStatus || '';
+            rWork.value = parsed.workExperience || '';
+            rProject.value = parsed.projectExperience || '';
+          }
+          msgEl.textContent = '解析完成';
+          msgEl.className = 'msg success';
+        } else {
+          msgEl.textContent = '解析失败：' + (data.message || '未知错误');
+          msgEl.className = 'msg';
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          // 取消请求，不显示错误
+          return;
+        }
+        msgEl.textContent = '网络错误或解析失败';
+        msgEl.className = 'msg';
+      } finally {
+        // 恢复按钮状态
+        btnParse.disabled = false;
+        btnParse.textContent = '简历解析';
+        btnCancel.style.display = 'none';
+      }
+    };
+
+    btnOptimize.onclick = async () => {
+      const content = rPersonal.value + '\n' + rEdu.value + '\n' + rWork.value + '\n' + rProject.value;
+      if (!content.trim()) {
+        msgEl.textContent = '请先填写简历内容';
+        msgEl.className = 'msg';
+        return;
+      }
+
+      // 显示加载状态
+      msgEl.textContent = '开始优化简历...';
+      msgEl.className = 'msg loading';
+      btnOptimize.disabled = true;
+      btnOptimize.textContent = '优化中...';
+      btnCancel.style.display = 'inline-block';
+      btnCancel.disabled = false;
+
+      // 创建 AbortController 用于取消请求
+      const controller = new AbortController();
+      const signal = controller.signal;
+
+      // 取消按钮事件
+      btnCancel.onclick = () => {
+        controller.abort();
+        msgEl.textContent = '优化已取消';
+        msgEl.className = 'msg';
+        btnOptimize.disabled = false;
+        btnOptimize.textContent = '简历优化';
+        btnCancel.style.display = 'none';
+      };
+
+      try {
+        const res = await fetch('/api/v1/resumes/optimize', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content }),
+          signal
+        });
+        const data = await parseApi(res);
+        if (data.success) {
+          const parsed = data.data;
+          const preview = `优化后结果：\n姓名：${parsed.name}\n个人信息：${parsed.personalInfo}\n教育经历：${parsed.education}\n求职状态：${parsed.jobStatus}\n工作经历：${parsed.workExperience}\n项目经历：${parsed.projectExperience}`;
+          const confirmed = confirm(preview + '\n\n是否采用优化后的内容并保存？');
+          if (confirmed) {
+            rName.value = parsed.name || '';
+            rPersonal.value = parsed.personalInfo || '';
+            rEdu.value = parsed.education || '';
+            rStatus.value = parsed.jobStatus || '';
+            rWork.value = parsed.workExperience || '';
+            rProject.value = parsed.projectExperience || '';
+
+            // 自动保存
+            btnSave.disabled = true;
+            btnSave.textContent = '保存中...';
+            const payload = {
+              name: rName.value.trim(),
+              personalInfo: rPersonal.value.trim(),
+              jobStatus: rStatus.value.trim(),
+              education: rEdu.value.trim(),
+              workExperience: rWork.value.trim(),
+              projectExperience: rProject.value.trim()
+            };
+            try {
+              const saveRes = await fetch('/api/v1/resumes/me', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              });
+              const saveData = await parseApi(saveRes);
+              if (saveData.success) {
+                msgEl.textContent = '优化并保存成功！';
+                msgEl.className = 'msg success';
+              } else {
+                msgEl.textContent = '保存失败：' + saveData.message;
+                msgEl.className = 'msg';
+              }
+            } catch (err) {
+              msgEl.textContent = '保存时网络错误';
+              msgEl.className = 'msg';
+            }
+            btnSave.disabled = false;
+            btnSave.textContent = '保存简历';
+          } else {
+            msgEl.textContent = '优化完成';
+            msgEl.className = 'msg success';
+          }
+        } else {
+          msgEl.textContent = '优化失败：' + (data.message || '未知错误');
+          msgEl.className = 'msg';
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          // 取消请求，不显示错误
+          return;
+        }
+        msgEl.textContent = '网络错误或优化失败';
+        msgEl.className = 'msg';
+      } finally {
+        // 恢复按钮状态
+        btnOptimize.disabled = false;
+        btnOptimize.textContent = '简历优化';
+        btnCancel.style.display = 'none';
+      }
+    };
+  </script>
+</body>
+</html>

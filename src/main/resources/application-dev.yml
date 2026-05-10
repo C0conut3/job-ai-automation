@@ -1,0 +1,11 @@
+# 本地开发可激活: --spring.profiles.active=dev
+spring:
+  jpa:
+    show-sql: true
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: trace
+
+# TODO: dev 专用数据源或调试开关

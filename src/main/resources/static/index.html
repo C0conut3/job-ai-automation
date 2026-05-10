@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>agent直聘</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --text: #e6edf3;
+      --muted: #8b9cb3;
+      --accent: #58a6ff;
+      --danger: #f85149;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+    }
+    .top-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      border-bottom: 1px solid #30363d;
+      background: #161b22;
+    }
+    .brand { font-size: 1.25rem; font-weight: 700; color: var(--accent); text-decoration: none; }
+    .nav-links { display: flex; gap: 1.5rem; align-items: center; }
+    .nav-links a { color: var(--text); text-decoration: none; font-size: 0.95rem; font-weight: 500; transition: color 0.2s; position: relative; }
+    .nav-links a:hover { color: var(--accent); }
+    .btn-login { padding: 0.4rem 1rem; border-radius: 6px; background: var(--accent); color: #0f1419 !important; font-weight: 600; }
+    .btn-login:hover { filter: brightness(1.1); }
+    
+    .hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 3rem 1.5rem;
+    }
+    .hero h1 { font-size: 2.5rem; margin: 0 0 1rem; }
+    .hero p { font-size: 1.1rem; color: var(--muted); max-width: 600px; margin: 0 0 2rem; line-height: 1.6; }
+    
+    .actions { display: flex; gap: 1rem; }
+    .btn-primary { padding: 0.75rem 2rem; border-radius: 8px; border: none; background: var(--accent); color: #0f1419; font-weight: 700; font-size: 1.05rem; cursor: pointer; text-decoration: none; }
+    .btn-primary:hover { filter: brightness(1.1); }
+
+    .loading { color: var(--muted); font-size: 1.1rem; margin-top: 2rem; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="top-nav">
+    <a href="/" class="brand">agent直聘</a>
+    <div class="nav-links" id="nav-container">
+      <!-- 动态插入导航链接 -->
+    </div>
+  </div>
+
+  <div class="hero">
+    <div id="loading" class="loading">正在加载系统...</div>
+    
+    <div id="content-unauth" class="hidden">
+      <h1>连接人才与机会的智能桥梁</h1>
+      <p>欢迎使用 Job AI Automation 智能体求职系统。无论您是寻找理想工作的求职者，还是寻觅优秀人才的招聘者，我们都能为您提供高效、便捷的自动化匹配服务。</p>
+      <div class="actions">
+        <a href="/seeker-jobs.html" class="btn-primary">我要找工作</a>
+        <a href="/recruiter-jobs.html" class="btn-primary" style="background: #2ea043; color: white;">我要招人</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function parseApi(res) {
+      const text = await res.text();
+      try { return JSON.parse(text); } catch { return { success: false, message: text || "请求失败" }; }
+    }
+
+    async function init() {
+      const navContainer = document.getElementById('nav-container');
+      const loadingEl = document.getElementById('loading');
+      const unauthEl = document.getElementById('content-unauth');
+
+      try {
+        const res = await fetch('/api/v1/auth/me', { credentials: "include" });
+        const data = await parseApi(res);
+
+        loadingEl.classList.add('hidden');
+
+        if (data.success && data.data) {
+          const u = data.data;
+          
+          // 获取未读消息
+          let unreadDot = '';
+          try {
+            const ur = await fetch('/api/v1/chat/unread-count', { credentials: "include" });
+            const urData = await parseApi(ur);
+            if (urData.success && urData.data > 0) {
+              unreadDot = `<span style="display:inline-block; width:8px; height:8px; background:var(--danger); border-radius:50%; margin-left:4px; vertical-align:middle;"></span>`;
+            }
+          } catch(e) {}
+
+          // 动态渲染右上角导航
+          let navHtml = '';
+          if (u.activeRole === 'SEEKER') {
+            navHtml += `<a href="/seeker-jobs.html">找工作</a>`;
+            navHtml += `<a href="/resume.html">我的简历</a>`;
+            navHtml += `<a href="/records.html">投递记录</a>`;
+            navHtml += `<a href="/messages.html">消息中心${unreadDot}</a>`;
+            navHtml += `<a href="/agent.html">AI 助手</a>`;
+          } else if (u.activeRole === 'RECRUITER') {
+            navHtml += `<a href="/recruiter-jobs.html">发职位</a>`;
+            navHtml += `<a href="/records.html">处理记录</a>`;
+            navHtml += `<a href="/messages.html">消息中心${unreadDot}</a>`;
+          } else if (u.activeRole === 'ADMIN') {
+            navHtml += `<a href="/admin-jobs.html">职位管理</a>`;
+          }
+          
+          navHtml += `<a href="/profile.html">个人中心 (${u.nickname || u.username})</a>`;
+          navContainer.innerHTML = navHtml;
+          unauthEl.classList.remove('hidden');
+
+        } else {
+          // 未登录状态
+          navContainer.innerHTML = `
+            <a href="/seeker-jobs.html">找工作</a>
+            <a href="/agent.html">AI 助手</a>
+            <a href="/login.html" class="btn-login">登录 / 注册</a>
+          `;
+          unauthEl.classList.remove('hidden');
+        }
+      } catch (err) {
+        loadingEl.classList.add('hidden');
+        unauthEl.classList.remove('hidden');
+        navContainer.innerHTML = `<a href="/login.html" class="btn-login">登录 / 注册</a>`;
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

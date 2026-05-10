@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>个人信息</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --text: #e6edf3;
+      --muted: #8b9cb3;
+      --accent: #58a6ff;
+      --danger: #f85149;
+      --warn: #d29922;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 1.75rem 1.25rem;
+    }
+    .wrap { max-width: 520px; margin: 0 auto; }
+    h1 { font-size: 1.25rem; margin: 0 0 1rem; }
+    .card {
+      background: var(--card);
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .row { margin-bottom: 0.65rem; font-size: 0.95rem; }
+    .row span { color: var(--muted); display: inline-block; min-width: 4.5rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; }
+    button {
+      padding: 0.55rem 1rem;
+      border-radius: 8px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-out { background: #30363d; color: var(--text); }
+    .btn-del { background: rgba(248, 81, 73, 0.2); color: var(--danger); border: 1px solid var(--danger); }
+    .btn-out:hover { filter: brightness(1.1); }
+    .btn-del:hover { filter: brightness(1.15); }
+    label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 0.25rem; }
+    input {
+      width: 100%;
+      padding: 0.55rem 0.65rem;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      background: #0d1117;
+      color: var(--text);
+    }
+    .msg { font-size: 0.85rem; color: var(--danger); min-height: 1.2rem; margin-top: 0.5rem; }
+    .hint { font-size: 0.82rem; color: var(--warn); margin-top: 0.75rem; line-height: 1.45; }
+    .nav { margin-top: 1.25rem; font-size: 0.88rem; }
+    .nav a { color: var(--accent); text-decoration: none; }
+    .loading { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>个人信息</h1>
+    <div id="state" class="loading">加载中…</div>
+    <div id="content" style="display: none;">
+      <div class="card" id="info-card"></div>
+      <div class="card">
+        <strong>账号操作</strong>
+        <div class="actions">
+          <button type="button" class="btn-out" id="btnLogout">登出</button>
+        </div>
+        <p class="hint">注销将删除本账号的投递记录、已发布职位及角色数据，并删除用户记录。需再次输入密码确认。</p>
+        <label for="del-pass">确认密码</label>
+        <input id="del-pass" type="password" autocomplete="current-password" placeholder="输入当前密码以注销" />
+        <div class="actions">
+          <button type="button" class="btn-del" id="btnDelete">注销账号</button>
+        </div>
+        <div class="msg" id="msg"></div>
+      </div>
+    </div>
+    <p class="nav"><a href="/">返回首页</a> · <a href="/login.html">登录 / 注册</a></p>
+  </div>
+
+  <script>
+    const state = document.getElementById("state");
+    const content = document.getElementById("content");
+    const infoCard = document.getElementById("info-card");
+    const msg = document.getElementById("msg");
+
+    async function parseApi(res) {
+      const text = await res.text();
+      try { return JSON.parse(text); } catch { return { success: false, message: text || "请求失败" }; }
+    }
+
+    function esc(s) {
+      if (s == null) return "";
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    async function loadMe() {
+      const res = await fetch("/api/v1/auth/me", {
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+      const data = await parseApi(res);
+      if (res.status === 401 || res.status === 403 || !data.success) {
+        window.location.href = "/login.html";
+        return;
+      }
+      const u = data.data;
+      infoCard.innerHTML =
+        '<div class="row"><span>ID</span>' + esc(u.id) + "</div>" +
+        '<div class="row"><span>用户名</span>' + esc(u.username) + "</div>" +
+        '<div class="row"><span>邮箱</span>' + esc(u.email || "—") + "</div>" +
+        '<div class="row"><span>昵称</span>' + esc(u.nickname || "—") + "</div>" +
+        '<div class="row"><span>注册时间</span>' + esc(u.createdAt) + "</div>" +
+        '<div class="row"><span>当前身份</span>' + esc(u.activeRole || "—") + "</div>" +
+        '<div class="row"><span>已开通角色</span>' + esc((u.roles || []).join("，")) + "</div>";
+      
+      state.style.display = "none";
+      content.style.display = "block";
+    }
+
+    document.getElementById("btnLogout").addEventListener("click", async () => {
+      msg.textContent = "";
+      const res = await fetch("/api/v1/auth/logout", {
+        method: "POST",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+      const data = await parseApi(res);
+      if (!data.success) {
+        msg.textContent = data.message || "登出失败";
+        return;
+      }
+      window.location.href = "/login.html";
+    });
+
+    document.getElementById("btnDelete").addEventListener("click", async () => {
+      msg.textContent = "";
+      const password = document.getElementById("del-pass").value;
+      if (!password) {
+        msg.textContent = "请填写密码";
+        return;
+      }
+      if (!confirm("确定要注销账号吗？此操作不可恢复。")) return;
+      const res = await fetch("/api/v1/auth/account/delete", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const data = await parseApi(res);
+      if (!data.success) {
+        msg.textContent = data.message || "注销失败";
+        return;
+      }
+      alert("账号已注销");
+      window.location.href = "/login.html";
+    });
+
+    loadMe();
+  </script>
+</body>
+</html>

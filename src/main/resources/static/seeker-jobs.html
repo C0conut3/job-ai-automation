@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>求职者 - 职位列表</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --text: #e6edf3;
+      --muted: #8b9cb3;
+      --accent: #58a6ff;
+      --danger: #f85149;
+      --ok: #3fb950;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 1.75rem 1.25rem;
+    }
+    .wrap { max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 1.35rem; margin: 0 0 1rem; }
+    .nav { margin-bottom: 1.25rem; font-size: 0.9rem; }
+    .nav a { color: var(--accent); text-decoration: none; margin-right: 0.5rem; }
+    .nav a:hover { text-decoration: underline; }
+    .job-card {
+      background: var(--card);
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .job-card:hover { border-color: var(--accent); }
+    .job-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; }
+    .job-title { font-size: 1.1rem; font-weight: 600; margin: 0; color: var(--accent); }
+    .job-salary { font-size: 1rem; font-weight: 600; color: var(--ok); }
+    .job-meta { font-size: 0.85rem; color: var(--muted); display: flex; gap: 1rem; margin-bottom: 0.5rem; }
+    .job-company { font-weight: 500; color: var(--text); }
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      background: #30363d;
+      color: var(--text);
+    }
+    .loading { color: var(--muted); }
+    .msg { font-size: 0.85rem; color: var(--danger); margin-bottom: 1rem; }
+    .unauth-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 3rem 2rem;
+      text-align: center;
+    }
+    .unauth-card h2 { margin: 0 0 1rem; color: var(--text); }
+    .unauth-card p { color: var(--muted); margin: 0 0 2rem; }
+    .unauth-card a {
+      display: inline-block;
+      padding: 0.6rem 1.5rem;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #0f1419;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .unauth-card a:hover { filter: brightness(1.1); }
+    .pagination { display: flex; justify-content: space-between; margin-top: 1rem; align-items: center; font-size: 0.85rem; }
+    .search-panel {
+      display: grid;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      padding: 1rem;
+      background: #15212d;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+    }
+    .search-panel label {
+      display: flex;
+      flex-direction: column;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .search-panel input,
+    .search-panel select {
+      margin-top: 0.5rem;
+      padding: 0.55rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      background: #0f1419;
+      color: var(--text);
+    }
+    .search-actions {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .search-actions button {
+      min-width: 100px;
+    }
+    button {
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      border: none;
+      background: var(--accent);
+      color: #0f1419;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { filter: brightness(1.1); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Modal styles */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      display: none; justify-content: center; align-items: center;
+      padding: 1rem;
+      z-index: 100;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: var(--bg);
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      width: 100%; max-width: 600px;
+      max-height: 90vh;
+      display: flex; flex-direction: column;
+    }
+    .modal-header {
+      padding: 1.25rem; border-bottom: 1px solid #30363d;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .modal-title { font-size: 1.2rem; font-weight: 600; margin: 0; }
+    .btn-close { background: transparent; color: var(--muted); font-size: 1.5rem; padding: 0; line-height: 1; margin: 0; }
+    .btn-close:hover { color: var(--text); background: transparent; }
+    .modal-body { padding: 1.25rem; overflow-y: auto; }
+    .modal-footer { padding: 1.25rem; border-top: 1px solid #30363d; display: flex; justify-content: flex-end; gap: 0.5rem; }
+    .job-desc { white-space: pre-wrap; font-size: 0.9rem; line-height: 1.6; color: var(--text); margin-top: 1rem; }
+    .btn-apply { background: var(--ok); color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>职位大厅 (求职者)</h1>
+    <p style="color: var(--muted); margin-top: 0; margin-bottom: 1rem;">默认优先展示符合偏好的岗位；填写筛选条件后可按名称、地点、薪资和岗位类型搜索。</p>
+    <p class="nav">
+      <a href="/">返回首页</a> · 
+      <a href="/resume.html">我的简历</a> · 
+      <a href="/records.html">投递记录</a> · 
+      <a href="/messages.html" id="btn-msg">消息中心</a>
+    </p>
+    <div class="search-panel">
+      <label>岗位名称
+        <input type="text" id="search-title" placeholder="例如：前端、Java" />
+      </label>
+      <label>工作地点
+        <input type="text" id="search-city" placeholder="例如：北京、深圳" />
+      </label>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;">
+        <label>最低薪资
+          <input type="number" id="search-salary-min" min="0" placeholder="月薪下限" />
+        </label>
+        <label>最高薪资
+          <input type="number" id="search-salary-max" min="0" placeholder="月薪上限" />
+        </label>
+        <label>岗位类型
+          <select id="search-work-type">
+            <option value="">全部类型</option>
+            <option value="FULL_TIME">全职</option>
+            <option value="PART_TIME">兼职</option>
+            <option value="CONTRACT">合同工</option>
+            <option value="INTERNSHIP">实习</option>
+            <option value="REMOTE">远程</option>
+          </select>
+        </label>
+      </div>
+      <div class="search-actions">
+        <button type="button" id="btn-search">搜索</button>
+        <button type="button" id="btn-reset">重置</button>
+      </div>
+    </div>
+    <div id="msg" class="msg"></div>
+    <div id="loading" class="loading">加载中...</div>
+    <div id="job-list"></div>
+    <div class="pagination" id="pagination" style="display: none;">
+      <button id="btn-prev">上一页</button>
+      <span id="page-info"></span>
+      <button id="btn-next">下一页</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="m-title">职位详情</h2>
+        <button class="btn-close" id="btn-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="job-header">
+          <h3 id="m-job-title" style="margin: 0; color: var(--accent);"></h3>
+          <div id="m-salary" class="job-salary"></div>
+        </div>
+        <div class="job-meta" style="margin-bottom: 1rem;">
+          <span id="m-company" class="job-company"></span>
+          <span id="m-city"></span>
+          <span id="m-work-type" class="badge"></span>
+          <span id="m-category" class="badge" style="background: rgba(88,166,255,0.2); color: var(--accent);"></span>
+        </div>
+        <hr style="border: none; border-top: 1px solid #30363d; margin: 1rem 0;" />
+        <h4>职位描述</h4>
+        <div id="m-desc" class="job-desc"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="btn-apply-job" class="btn-apply">投递简历</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const jobListEl = document.getElementById('job-list');
+    const msgEl = document.getElementById('msg');
+    const loadingEl = document.getElementById('loading');
+    const paginationEl = document.getElementById('pagination');
+    const btnPrev = document.getElementById('btn-prev');
+    const btnNext = document.getElementById('btn-next');
+    const pageInfo = document.getElementById('page-info');
+
+    const modal = document.getElementById('modal');
+    const btnClose = document.getElementById('btn-close');
+    const btnApply = document.getElementById('btn-apply-job');
+    const btnSearch = document.getElementById('btn-search');
+    const btnReset = document.getElementById('btn-reset');
+    const searchTitle = document.getElementById('search-title');
+    const searchCity = document.getElementById('search-city');
+    const searchSalaryMin = document.getElementById('search-salary-min');
+    const searchSalaryMax = document.getElementById('search-salary-max');
+    const searchWorkType = document.getElementById('search-work-type');
+
+    let currentPage = 0;
+    let currentJobId = null;
+    let currentSearch = {
+      title: null,
+      city: null,
+      salaryMin: null,
+      salaryMax: null,
+      workType: null
+    };
+
+    async function parseApi(res) {
+      const text = await res.text();
+      try { return JSON.parse(text); } catch { return { success: false, message: text || "请求失败" }; }
+    }
+
+    function esc(s) {
+      if (s == null) return "";
+      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    function formatSalary(min, max) {
+      if (!min && !max) return "面议";
+      if (!min) return `最多 ${max/1000}k`;
+      if (!max) return `${min/1000}k 起`;
+      return `${min/1000}k - ${max/1000}k`;
+    }
+
+    function buildSearchQuery(page) {
+      const params = new URLSearchParams();
+      params.set('page', page);
+      params.set('size', 10);
+      if (currentSearch.title) params.set('title', currentSearch.title);
+      if (currentSearch.city) params.set('city', currentSearch.city);
+      if (currentSearch.salaryMin !== null) params.set('salaryMin', currentSearch.salaryMin);
+      if (currentSearch.salaryMax !== null) params.set('salaryMax', currentSearch.salaryMax);
+      if (currentSearch.workType) params.set('workType', currentSearch.workType);
+      return params.toString();
+    }
+
+    const workTypeMap = {
+      FULL_TIME: '全职',
+      PART_TIME: '兼职',
+      CONTRACT: '合同工',
+      INTERNSHIP: '实习',
+      REMOTE: '远程'
+    };
+
+    async function loadJobs(page = 0) {
+      loadingEl.style.display = 'block';
+      jobListEl.innerHTML = '';
+      msgEl.textContent = '';
+      paginationEl.style.display = 'none';
+
+      try {
+        const query = buildSearchQuery(page);
+        const res = await fetch(`/api/v1/seeker/jobs?${query}`, { credentials: "include" });
+        const data = await parseApi(res);
+        if (res.status === 401 || res.status === 403) {
+          jobListEl.innerHTML = `
+            <div class="unauth-card">
+              <h2>需要登录</h2>
+              <p>请先以求职者身份登录后查看并投递职位</p>
+              <a href="/login.html">前往登录 / 注册</a>
+            </div>
+          `;
+          loadingEl.style.display = 'none';
+          return;
+        }
+        if (!data.success) {
+          msgEl.textContent = data.message || "加载失败";
+          loadingEl.style.display = 'none';
+          return;
+        }
+
+        const pageData = data.data;
+        currentPage = pageData.page;
+
+        if (pageData.content.length === 0) {
+          jobListEl.innerHTML = '<p style="color: var(--muted);">暂无职位</p>';
+        } else {
+          pageData.content.forEach(job => {
+            const card = document.createElement('div');
+            card.className = 'job-card';
+            card.onclick = () => openJob(job.id);
+            card.innerHTML = `
+              <div class="job-header">
+                <h3 class="job-title">${esc(job.title)}</h3>
+                <div class="job-salary">${esc(formatSalary(job.salaryMin, job.salaryMax))}</div>
+              </div>
+              <div class="job-meta">
+                <span class="job-company">${esc(job.companyName)}</span>
+                <span>${esc(job.city || '全国')}</span>
+                <span class="badge">${esc(workTypeMap[job.workType] || job.workType)}</span>
+              </div>
+            `;
+            jobListEl.appendChild(card);
+          });
+        }
+
+        pageInfo.textContent = `第 ${pageData.page + 1} 页 / 共 ${pageData.totalPages} 页`;
+        btnPrev.disabled = pageData.page === 0;
+        btnNext.disabled = pageData.page >= pageData.totalPages - 1;
+        paginationEl.style.display = 'flex';
+
+      } catch (err) {
+        msgEl.textContent = "网络错误";
+      }
+      loadingEl.style.display = 'none';
+      
+      // Auto open job detail if jobId is present in URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const jid = urlParams.get('jobId');
+      if (jid && !document.getElementById('modal').classList.contains('active')) {
+        openJob(jid);
+      }
+    }
+
+    async function openJob(id) {
+      currentJobId = id;
+      try {
+        const res = await fetch(`/api/v1/seeker/jobs/${id}`, { credentials: "include" });
+        const data = await parseApi(res);
+        if (!data.success) {
+          alert(data.message || "加载详情失败");
+          return;
+        }
+        const job = data.data;
+        document.getElementById('m-job-title').textContent = job.title;
+        document.getElementById('m-salary').textContent = formatSalary(job.salaryMin, job.salaryMax);
+        document.getElementById('m-company').textContent = job.companyName;
+        document.getElementById('m-city').textContent = job.city || '全国';
+        document.getElementById('m-work-type').textContent = workTypeMap[job.workType] || job.workType;
+        document.getElementById('m-category').textContent = job.categoryName || '未知分类';
+        document.getElementById('m-desc').textContent = job.description || '暂无描述';
+        
+        modal.classList.add('active');
+      } catch (err) {
+        alert("网络错误");
+      }
+    }
+
+    btnClose.onclick = () => modal.classList.remove('active');
+    modal.onclick = (e) => { if(e.target === modal) modal.classList.remove('active'); }
+
+    btnApply.onclick = async () => {
+      if (!currentJobId) return;
+      btnApply.disabled = true;
+      try {
+        const res = await fetch(`/api/v1/seeker/jobs/${currentJobId}/apply`, {
+          method: 'POST',
+          credentials: "include"
+        });
+        const data = await parseApi(res);
+        if (!data.success) {
+          alert(data.message || "投递失败");
+        } else {
+          alert("投递成功！");
+          modal.classList.remove('active');
+        }
+      } catch (err) {
+        alert("网络错误");
+      }
+      btnApply.disabled = false;
+    };
+
+    btnPrev.onclick = () => loadJobs(currentPage - 1);
+    btnNext.onclick = () => loadJobs(currentPage + 1);
+    btnSearch.onclick = () => {
+      currentSearch = {
+        title: searchTitle.value.trim() || null,
+        city: searchCity.value.trim() || null,
+        salaryMin: searchSalaryMin.value ? parseInt(searchSalaryMin.value, 10) : null,
+        salaryMax: searchSalaryMax.value ? parseInt(searchSalaryMax.value, 10) : null,
+        workType: searchWorkType.value || null
+      };
+      loadJobs(0);
+    };
+    btnReset.onclick = () => {
+      searchTitle.value = '';
+      searchCity.value = '';
+      searchSalaryMin.value = '';
+      searchSalaryMax.value = '';
+      searchWorkType.value = '';
+      currentSearch = {
+        title: null,
+        city: null,
+        salaryMin: null,
+        salaryMax: null,
+        workType: null
+      };
+      loadJobs(0);
+    };
+
+    // 检查未读消息
+    async function checkUnread() {
+      try {
+        const ur = await fetch('/api/v1/chat/unread-count', { credentials: "include" });
+        const urData = await parseApi(ur);
+        if (urData.success && urData.data > 0) {
+          const btnMsg = document.getElementById('btn-msg');
+          if (btnMsg) {
+            btnMsg.innerHTML = `消息中心 <span style="display:inline-block;width:8px;height:8px;background:var(--danger);border-radius:50%;margin-left:2px;"></span>`;
+          }
+        }
+      } catch (e) {}
+    }
+
+    loadJobs().then(checkUnread);
+  </script>
+</body>
+</html>
