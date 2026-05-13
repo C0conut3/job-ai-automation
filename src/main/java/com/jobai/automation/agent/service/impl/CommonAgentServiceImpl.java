@@ -1,32 +1,37 @@
 package com.jobai.automation.agent.service.impl;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jobai.automation.agent.dto.AgentRequest;
 import com.jobai.automation.agent.dto.AgentResponse;
 import com.jobai.automation.agent.dto.MessageDto;
 import com.jobai.automation.agent.service.CommonAgentService;
 import com.jobai.automation.config.AiConfig;
+import com.jobai.automation.mcp.FilesystemMcpService;
+import com.jobai.automation.service.AiService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Service
 public class CommonAgentServiceImpl implements CommonAgentService {
 
-    private final AiConfig aiConfig;
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(30))
-            .build();
+    private static final Logger log = LoggerFactory.getLogger(CommonAgentServiceImpl.class);
+    private static final String BASE_DIR = "mcp_context";
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    public CommonAgentServiceImpl(AiConfig aiConfig) {
+    private final AiConfig aiConfig;
+    private final AiService aiService;
+    private final FilesystemMcpService filesystemMcpService;
+
+    public CommonAgentServiceImpl(AiConfig aiConfig, AiService aiService, FilesystemMcpService filesystemMcpService) {
         this.aiConfig = aiConfig;
+        this.aiService = aiService;
+        this.filesystemMcpService = filesystemMcpService;
     }
 
     @Override
@@ -44,12 +49,16 @@ public class CommonAgentServiceImpl implements CommonAgentService {
         try {
             String model = (request.model() != null && !request.model().isBlank())
                     ? request.model() : aiConfig.getModelForCommonAgent();
-            String url = aiConfig.getBaseUrl();
-            if (!url.endsWith("/")) url = url + "/";
-            url = url + "v1/chat/completions";
+
+            String userId = request.userId() != null ? request.userId() : "default_user";
+            String sessionId = request.sessionId() != null ? request.sessionId() : "default_session";
+            String contextFile = "context_" + userId + "_" + sessionId + ".txt";
 
             String systemPrompt = "你是一位专业的职业顾问和技术导师，专注于帮助求职者提升技能和职业发展。\n\n" +
-                    "请针对以下问题提供简洁、专业且实用的回答：\n\n" +
+                    "回答原则：\n" +
+                    "1. 优先以用户当前问题为主，上下文内容仅作为辅助参考\n" +
+                    "2. 聚焦就业相关问题，包括面试、技术、职业规划等\n" +
+                    "3. 如果用户问题与就业无关，礼貌地引导用户询问就业相关话题\n\n" +
                     "擅长领域包括：\n" +
                     "- 面试技巧与准备\n" +
                     "- 技术面试题解答\n" +
@@ -60,48 +69,20 @@ public class CommonAgentServiceImpl implements CommonAgentService {
                     "- 职场沟通技巧\n\n" +
                     "请用友好、专业的语气回复，语言简洁明了，重点突出可执行性。";
 
+            String contextContent = loadContext(contextFile);
+            
             String userPrompt = userInput;
-
-            var root = objectMapper.createObjectNode();
-            root.put("model", model);
-            root.put("max_tokens", 1500);
-            var messages = objectMapper.createArrayNode();
-            var m1 = objectMapper.createObjectNode();
-            m1.put("role", "system");
-            m1.put("content", systemPrompt);
-            var m2 = objectMapper.createObjectNode();
-            m2.put("role", "user");
-            m2.put("content", userPrompt);
-            messages.add(m1);
-            messages.add(m2);
-            root.set("messages", messages);
-            root.put("temperature", 0.7);
-
-            String body = objectMapper.writeValueAsString(root);
-
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(60))
-                    .header("Content-Type", "application/json; charset=utf-8")
-                    .header("Authorization", "Bearer " + aiConfig.getApiKey())
-                    .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() / 100 != 2) {
-                throw new RuntimeException("AI API error: " + response.statusCode() + " - " + response.body());
+            if (contextContent != null && !contextContent.isBlank()) {
+                userPrompt = "【历史对话摘要】\n" + contextContent + "\n\n【当前问题】\n" + userInput;
             }
 
-            JsonNode resJson = objectMapper.readTree(response.body());
-            JsonNode choices = resJson.path("choices");
-            String answerContent = "";
-            if (choices.isArray() && choices.size() > 0) {
-                answerContent = choices.get(0).path("message").path("content").asText("");
-            }
+            String answerContent = aiService.chatWithTemperature(systemPrompt, userPrompt, model, 1500, 0.7);
 
             if (answerContent == null || answerContent.isBlank()) {
                 answerContent = "抱歉，暂时无法回答这个问题，请稍后重试。";
             }
+
+            saveContext(contextFile, userInput, answerContent);
 
             return new AgentResponse(
                     java.util.List.of(new MessageDto("assistant", answerContent)),
@@ -111,11 +92,45 @@ public class CommonAgentServiceImpl implements CommonAgentService {
 
         } catch (Exception ex) {
             String errorMessage = "⚠️ 回答问题时遇到问题：\n\n" + ex.getMessage() + "\n\n请稍后重试。";
+            log.error("Common agent error", ex);
             return new AgentResponse(
                     java.util.List.of(new MessageDto("assistant", errorMessage)),
                     java.util.List.of(),
                     null
             );
+        }
+    }
+
+    private String loadContext(String contextFile) {
+        try {
+            Path filePath = Paths.get(BASE_DIR, contextFile);
+            if (Files.exists(filePath)) {
+                String content = Files.readString(filePath);
+                if (!content.isBlank()) {
+                    log.debug("Loaded context from {}", contextFile);
+                    return content;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to load context from {}: {}", contextFile, e.getMessage());
+        }
+        return null;
+    }
+
+    private void saveContext(String contextFile, String userInput, String answer) {
+        try {
+            Path filePath = Paths.get(BASE_DIR, contextFile);
+            String timestamp = LocalDateTime.now().format(FORMATTER);
+            
+            String newEntry = String.format("[%s]\n用户: %s\n助手: %s\n\n", timestamp, userInput, answer);
+            
+            String existingContent = Files.exists(filePath) ? Files.readString(filePath) : "";
+            String newContent = existingContent + newEntry;
+            
+            Files.writeString(filePath, newContent);
+            log.debug("Saved context to {}", contextFile);
+        } catch (Exception e) {
+            log.warn("Failed to save context to {}: {}", contextFile, e.getMessage());
         }
     }
 }

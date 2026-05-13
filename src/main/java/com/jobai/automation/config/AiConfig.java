@@ -1,16 +1,26 @@
 package com.jobai.automation.config;
 
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.tool.ToolCallbackProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.util.List;
 
 @Configuration
 public class AiConfig {
 
-    @Value("${ai.openai.api-key:}")
+    @Value("${spring.ai.dashscope.api-key:}")
     private String apiKey;
 
-    @Value("${ai.openai.model:gpt-3.5-turbo}")
+    @Value("${spring.ai.dashscope.chat.options.model:qwen-plus}")
     private String model;
+
+    @Value("${spring.ai.dashscope.base-url:https://dashscope.aliyuncs.com}")
+    private String baseUrl;
 
     @Value("${ai.openai.model.parse:}")
     private String parseModel;
@@ -30,8 +40,12 @@ public class AiConfig {
     @Value("${ai.openai.model.common-agent:}")
     private String commonAgentModel;
 
-    @Value("${ai.openai.base-url:https://api.openai.com}")
-    private String baseUrl;
+    @Bean("openAiChatClient")
+    public ChatClient openAiChatClient(ChatModel chatModel, com.jobai.automation.mcp.FilesystemMcpService filesystemMcpService) {
+        return ChatClient.builder(chatModel)
+                .defaultTools(filesystemMcpService)
+                .build();
+    }
 
     public String getApiKey() {
         return apiKey;
@@ -39,6 +53,10 @@ public class AiConfig {
 
     public String getModel() {
         return model;
+    }
+
+    public String getBaseUrl() {
+        return baseUrl;
     }
 
     public String getModelForParse() {
@@ -63,9 +81,5 @@ public class AiConfig {
 
     public String getModelForCommonAgent() {
         return (commonAgentModel != null && !commonAgentModel.isBlank()) ? commonAgentModel : model;
-    }
-
-    public String getBaseUrl() {
-        return baseUrl;
     }
 }

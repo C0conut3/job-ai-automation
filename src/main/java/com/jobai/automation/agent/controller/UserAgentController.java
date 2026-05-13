@@ -30,7 +30,7 @@ public class UserAgentController {
             // For resume-related actions require seeker role
             AuthSessionSupport.requireActiveRole(servletRequest, UserRole.SEEKER);
             if (request.userId() == null || request.userId().isBlank()) {
-                request = new AgentRequest(String.valueOf(currentUserId), request.category(), request.message(), request.model());
+                request = new AgentRequest(String.valueOf(currentUserId), request.category(), request.message(), request.model(), request.sessionId());
             }
         } catch (Exception ignore) {
             // If no session or not seeker, leave request as-is (classification still works without resume)

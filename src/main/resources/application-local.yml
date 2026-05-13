@@ -10,3 +10,8 @@ spring:
     hibernate:
       ddl-auto: create-drop
     database-platform: org.hibernate.dialect.H2Dialect
+  ai:
+    openai:
+      api-key: test-api-key
+      model: gpt-3.5-turbo
+      base-url: https://api.openai.com

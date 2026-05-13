@@ -22,9 +22,24 @@ spring:
         format_sql: true
         jdbc:
           time_zone: Asia/Shanghai
+  ai:
+    dashscope:
+      api-key: #your dashscope api key
+      chat:
+        options:
+          model: qwen-plus
+    mcp:
+      client:
+        enabled: false
 
 server:
   port: 8080
+
+logging:
+  charset:
+    console: UTF-8
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
 
 management:
   endpoints:
@@ -35,18 +50,12 @@ management:
     health:
       show-details: always
 
-# TODO: AI 服务、第三方招聘平台 API、消息队列等配置项后续在此补充
-
+# AI 模型配置（各Agent独立配置）
 ai:
   openai:
-    api-key: sk-90be84e8e3054616ad876d37f949be54
-    model: qwen-plus
     model.parse: qwen-plus
     model.optimize: qwen-plus
-    model.user-agent: qwen3.6-flash
-    model.preference-agent: deepseek-v3.2
-    model.advice-agent: qwen3.6-plus
-    model.common-agent: kimi-k2.6
-    base-url: https://dashscope.aliyuncs.com/compatible-mode
-    connect-timeout: 30000
-    read-timeout: 60000
+    model.user-agent: qwen-max
+    model.preference-agent: deepseek-v3
+    model.advice-agent: qwen-plus
+    model.common-agent: qwen-plus

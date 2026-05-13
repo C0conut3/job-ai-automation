@@ -6,7 +6,7 @@ import com.jobai.automation.agent.dto.AgentResponse;
 public interface PreferenceAgentService {
 
     /**
-     * 对用户简�?行为进行偏好分析，返回统一 AgentResponse
+     * 对用户简�?行为进行偏好分析，返回统一 AgentResponse
      */
     AgentResponse analyze(AgentRequest request);
 }

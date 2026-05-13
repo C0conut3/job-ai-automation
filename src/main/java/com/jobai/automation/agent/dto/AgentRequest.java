@@ -6,5 +6,6 @@ public record AgentRequest(
         String userId,
         AgentCategory category,
         String message,
-        String model // 可选：覆盖默认模型，例如用于优化或解析
+        String model, // 可选：覆盖默认模型，例如用于优化或解析
+        String sessionId // 可选：对话session ID，用于区分不同对话的上下文文件
 ) {}

@@ -73,7 +73,7 @@ public class AgentChatServiceImpl implements AgentChatService {
         AgentChatSession session = sessionRepository.findByIdAndUserId(sessionId, userId)
                 .orElseThrow(() -> new IllegalArgumentException("Session not found"));
 
-        AgentRequest request = new AgentRequest(String.valueOf(userId), null, message, null);
+        AgentRequest request = new AgentRequest(String.valueOf(userId), null, message, null, String.valueOf(sessionId));
         AgentResponse response = userAgentService.handle(request);
 
         String assistantContent = response.conversation().isEmpty() ? "" : response.conversation().get(0).content();

@@ -1,0 +1,9 @@
+﻿用户简历信息
+
+姓名: 张三
+邮箱: zhangsan@example.com
+电话: 13800138000
+学历: 本科
+专业: 计算机科学
+工作经验: 3年
+技能: Java, Spring Boot, MySQL, React

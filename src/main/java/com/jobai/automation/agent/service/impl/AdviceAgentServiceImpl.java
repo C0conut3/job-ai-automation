@@ -1,35 +1,25 @@
 package com.jobai.automation.agent.service.impl;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jobai.automation.agent.dto.AgentRequest;
 import com.jobai.automation.agent.dto.AgentResponse;
 import com.jobai.automation.agent.dto.MessageDto;
 import com.jobai.automation.agent.service.AdviceAgentService;
 import com.jobai.automation.config.AiConfig;
 import com.jobai.automation.resume.service.ResumeService;
+import com.jobai.automation.service.AiService;
 import org.springframework.stereotype.Service;
-
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 
 @Service
 public class AdviceAgentServiceImpl implements AdviceAgentService {
 
     private final ResumeService resumeService;
     private final AiConfig aiConfig;
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(30))
-            .build();
+    private final AiService aiService;
 
-    public AdviceAgentServiceImpl(ResumeService resumeService, AiConfig aiConfig) {
+    public AdviceAgentServiceImpl(ResumeService resumeService, AiConfig aiConfig, AiService aiService) {
         this.resumeService = resumeService;
         this.aiConfig = aiConfig;
+        this.aiService = aiService;
     }
 
     @Override
@@ -74,9 +64,6 @@ public class AdviceAgentServiceImpl implements AdviceAgentService {
         try {
             String model = (request.model() != null && !request.model().isBlank())
                     ? request.model() : aiConfig.getModelForAdviceAgent();
-            String url = aiConfig.getBaseUrl();
-            if (!url.endsWith("/")) url = url + "/";
-            url = url + "v1/chat/completions";
 
             String systemPrompt = "你是一位专业的职业发展顾问和简历分析师。请根据用户的简历和输入问题，提供专业、详细且可操作的职业建议。\n\n" +
                     "请按以下结构返回分析报告（使用 Markdown 格式）：\n\n" +
@@ -97,42 +84,7 @@ public class AdviceAgentServiceImpl implements AdviceAgentService {
             String userPrompt = "用户问题：" + (userInput.isBlank() ? "请对我的简历进行全面的竞争力分析和发展建议" : userInput) + "\n\n" +
                     "【用户简历】\n" + resumeText;
 
-            var root = objectMapper.createObjectNode();
-            root.put("model", model);
-            root.put("max_tokens", 2000);
-            var messages = objectMapper.createArrayNode();
-            var m1 = objectMapper.createObjectNode();
-            m1.put("role", "system");
-            m1.put("content", systemPrompt);
-            var m2 = objectMapper.createObjectNode();
-            m2.put("role", "user");
-            m2.put("content", userPrompt);
-            messages.add(m1);
-            messages.add(m2);
-            root.set("messages", messages);
-            root.put("temperature", 0.7);
-
-            String body = objectMapper.writeValueAsString(root);
-
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(120))
-                    .header("Content-Type", "application/json; charset=utf-8")
-                    .header("Authorization", "Bearer " + aiConfig.getApiKey())
-                    .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() / 100 != 2) {
-                throw new RuntimeException("AI API error: " + response.statusCode() + " - " + response.body());
-            }
-
-            JsonNode resJson = objectMapper.readTree(response.body());
-            JsonNode choices = resJson.path("choices");
-            String adviceContent = "";
-            if (choices.isArray() && choices.size() > 0) {
-                adviceContent = choices.get(0).path("message").path("content").asText("");
-            }
+            String adviceContent = aiService.chatWithTemperature(systemPrompt, userPrompt, model, 2000, 0.7);
 
             if (adviceContent == null || adviceContent.isBlank()) {
                 adviceContent = "抱歉，暂时无法生成分析建议，请稍后重试。";
