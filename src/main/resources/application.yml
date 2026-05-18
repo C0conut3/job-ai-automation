@@ -24,7 +24,7 @@ spring:
           time_zone: Asia/Shanghai
   ai:
     dashscope:
-      api-key: #your dashscope api key
+      api-key: sk-90be84e8e3054616ad876d37f949be54
       chat:
         options:
           model: qwen-plus
@@ -45,10 +45,12 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,metrics
   endpoint:
     health:
       show-details: always
+    metrics:
+      enabled: true
 
 # AI 模型配置（各Agent独立配置）
 ai:

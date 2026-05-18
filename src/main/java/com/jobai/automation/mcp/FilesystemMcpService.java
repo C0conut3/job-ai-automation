@@ -14,8 +14,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * 简易的 Filesystem MCP 服务，提供基本的文件操作工具供 AI 使用。
- * 用于在通用问答 Agent 中实现基于文件系统的上下文管理。
+ * Lightweight Filesystem MCP service providing basic file operations for AI tool calling.
+ * Used for context management in the Common Agent.
  */
 @Service
 public class FilesystemMcpService {
@@ -26,30 +26,30 @@ public class FilesystemMcpService {
     public FilesystemMcpService() {
         try {
             Files.createDirectories(Paths.get(BASE_DIR));
-            log.info("MCP 上下文目录已初始化: {}", Paths.get(BASE_DIR).toAbsolutePath());
+            log.info("MCP context directory initialized: {}", Paths.get(BASE_DIR).toAbsolutePath());
         } catch (IOException e) {
-            log.error("无法创建 MCP 上下文目录", e);
+            log.error("Failed to create MCP context directory", e);
         }
     }
 
-    @Tool(description = "读取指定路径的文件内容，用于获取对话上下文或相关背景信息")
+    @Tool(description = "Read file content for getting conversation context or background information")
     public String read_file(String path) {
-        log.info("MCP 工具调用: 读取文件 {}", path);
+        log.info("MCP tool called: read_file {}", path);
         try {
             Path filePath = Paths.get(BASE_DIR, path);
             if (!Files.exists(filePath)) {
-                return "错误: 文件不存在: " + path;
+                return "Error: File not found: " + path;
             }
             return Files.readString(filePath);
         } catch (IOException e) {
-            log.error("读取文件失败: {}", path, e);
-            return "错误: 读取文件失败: " + e.getMessage();
+            log.error("Failed to read file: {}", path, e);
+            return "Error: Failed to read file: " + e.getMessage();
         }
     }
 
-    @Tool(description = "将内容写入指定文件，用于保存或更新对话上下文")
+    @Tool(description = "Write content to specified file for saving or updating conversation context")
     public String write_file(String path, String content) {
-        log.info("MCP 工具调用: 写入文件 {}", path);
+        log.info("MCP tool called: write_file {}", path);
         try {
             Path filePath = Paths.get(BASE_DIR, path);
             Path parentDir = filePath.getParent();
@@ -59,25 +59,25 @@ public class FilesystemMcpService {
                 Files.createDirectories(Paths.get(BASE_DIR));
             }
             Files.writeString(filePath, content);
-            return "成功: 内容已写入 " + path;
+            return "Success: Content written to " + path;
         } catch (IOException e) {
-            log.error("写入文件失败: {}", path, e);
-            return "错误: 写入文件失败: " + e.getMessage();
+            log.error("Failed to write file: {}", path, e);
+            return "Error: Failed to write file: " + e.getMessage();
         }
     }
 
-    @Tool(description = "列出指定目录下的文件和子目录")
+    @Tool(description = "List files and subdirectories in specified directory")
     public List<String> list_directory(String path) {
-        log.info("MCP 工具调用: 列出目录 {}", path);
+        log.info("MCP tool called: list_directory {}", path);
         try {
-            Path dirPath = (path == null || path.isEmpty() || path.equals(".")) 
-                    ? Paths.get(BASE_DIR) 
+            Path dirPath = (path == null || path.isEmpty() || path.equals("."))
+                    ? Paths.get(BASE_DIR)
                     : Paths.get(BASE_DIR, path);
-            
+
             if (!Files.exists(dirPath)) {
-                return List.of("错误: 目录不存在: " + path);
+                return List.of("Error: Directory not found: " + path);
             }
-            
+
             try (Stream<Path> stream = Files.list(dirPath)) {
                 return stream
                         .map(p -> {
@@ -87,8 +87,8 @@ public class FilesystemMcpService {
                         .collect(Collectors.toList());
             }
         } catch (IOException e) {
-            log.error("列出目录失败: {}", path, e);
-            return List.of("错误: 列出目录失败: " + e.getMessage());
+            log.error("Failed to list directory: {}", path, e);
+            return List.of("Error: Failed to list directory: " + e.getMessage());
         }
     }
 }
