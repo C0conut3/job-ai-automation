@@ -350,8 +350,8 @@
                     <span>💰</span>
                     <span>估算成本</span>
                 </div>
-                <div class="stat-value" id="estimatedCost">$0.00</div>
-                <div class="stat-label">Estimated Cost (USD)</div>
+                <div class="stat-value" id="estimatedCost">¥0.00</div>
+                <div class="stat-label">Estimated Cost (CNY)</div>
             </div>
 
             <div class="card" style="grid-column: span 2;">
@@ -412,7 +412,7 @@
             document.getElementById('totalCalls').textContent = formatNumber(data.totalCalls || 0);
             document.getElementById('totalInput').textContent = formatNumber(data.totalInputTokens || 0);
             document.getElementById('totalOutput').textContent = formatNumber(data.totalOutputTokens || 0);
-            document.getElementById('estimatedCost').textContent = '$' + (data.estimatedCost || '0.00');
+            document.getElementById('estimatedCost').textContent = '¥' + (data.estimatedCost || '0.00');
 
             const modelList = document.getElementById('modelList');
             const modelCallCount = data.modelCallCount || {};

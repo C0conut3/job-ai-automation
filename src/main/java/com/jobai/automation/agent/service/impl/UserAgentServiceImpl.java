@@ -14,6 +14,7 @@ import com.jobai.automation.config.AiConfig;
 import com.jobai.automation.service.AiService;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -132,16 +133,23 @@ public class UserAgentServiceImpl implements UserAgentService {
                 JsonNode parsed2 = objectMapper.readTree(jsonOut);
                 String finalCat = parsed2.path("category").asText("");
                 String finalContent = parsed2.path("content").asText("");
+                
+                // 调用子Agent获取初步答复
+                AgentResponse rawResponse;
                 if ("DELIVERY".equals(finalCat)) {
                     AgentRequest prefReq = new AgentRequest(request.userId(), AgentCategory.PREFERENCE, (finalContent == null || finalContent.isBlank()) ? request.message() : finalContent, request.model(), request.sessionId());
-                    return preferenceAgentService.analyze(prefReq);
+                    rawResponse = preferenceAgentService.analyze(prefReq);
                 } else if ("ANALYSIS".equals(finalCat)) {
                     AgentRequest adviceReq = new AgentRequest(request.userId(), AgentCategory.ADVICE, (finalContent == null || finalContent.isBlank()) ? request.message() : finalContent, request.model(), request.sessionId());
-                    return adviceAgentService.suggest(adviceReq);
-                } else if ("OTHER".equals(finalCat)) {
+                    rawResponse = adviceAgentService.suggest(adviceReq);
+                } else {
                     AgentRequest commonReq = new AgentRequest(request.userId(), AgentCategory.COMMON, (finalContent == null || finalContent.isBlank()) ? request.message() : finalContent, request.model(), request.sessionId());
-                    return commonAgentService.ask(commonReq);
+                    rawResponse = commonAgentService.ask(commonReq);
                 }
+                
+                // 【核心协作逻辑】主控Agent优化子Agent的答复
+                return optimizeResponse(request, finalCat, rawResponse);
+                
             } catch (Exception ignore) {
             }
 
@@ -150,11 +158,66 @@ public class UserAgentServiceImpl implements UserAgentService {
         }
 
         if (request.category() == AgentCategory.PREFERENCE) {
-            return preferenceAgentService.analyze(request);
+            AgentResponse rawResponse = preferenceAgentService.analyze(request);
+            return optimizeResponse(request, "DELIVERY", rawResponse);
         } else if (request.category() == AgentCategory.ADVICE) {
-            return adviceAgentService.suggest(request);
+            AgentResponse rawResponse = adviceAgentService.suggest(request);
+            return optimizeResponse(request, "ANALYSIS", rawResponse);
         } else {
-            return commonAgentService.ask(request);
+            AgentResponse rawResponse = commonAgentService.ask(request);
+            return optimizeResponse(request, "OTHER", rawResponse);
         }
+    }
+    
+    /**
+     * 主控Agent使用大模型重新思考并优化子Agent的答复
+     * @param request 原始请求
+     * @param category 意图分类
+     * @param rawResponse 子Agent的原始答复
+     * @return 优化后的最终答复
+     */
+    private AgentResponse optimizeResponse(AgentRequest request, String category, AgentResponse rawResponse) {
+        // 1. 收集子Agent的原始回答内容
+        String rawContent = "";
+        if (rawResponse.conversation() != null && !rawResponse.conversation().isEmpty()) {
+            rawContent = rawResponse.conversation().stream()
+                    .map(MessageDto::content)
+                    .reduce((a, b) -> a + "\n\n" + b)
+                    .orElse("");
+        }
+        
+        // 2. 如果没有原始内容，直接返回
+        if (rawContent.isBlank()) {
+            return rawResponse;
+        }
+        
+        // 3. 构建优化提示词，让大模型重新思考并优化
+        String systemPrompt = "你是一位专业的回答优化助手。请仔细审阅以下AI助手的回答，并进行优化改进。\n" +
+                "优化要求：\n" +
+                "1. 语言更友好、自然，符合人类交流习惯\n" +
+                "2. 逻辑更清晰，结构更合理\n" +
+                "3. 内容更简洁，去除冗余信息\n" +
+                "4. 保持原意不变，不增减核心信息\n" +
+                "5. 使用适当的格式和标点，提升可读性\n" +
+                "6. 根据问题类型使用合适的语气（求职推荐用亲切语气，技术分析用专业语气）";
+        
+        String userPrompt = "用户问题：" + request.message() + "\n\n待优化的回答：\n" + rawContent;
+        
+        // 4. 调用大模型进行优化
+        String optimizedContent;
+        try {
+            String model = aiConfig.getModelForUserAgent();
+            optimizedContent = aiService.chatWithTemperature(systemPrompt, userPrompt, model, 2000, 0.7);
+        } catch (Exception e) {
+            // 如果优化失败，使用原始内容
+            optimizedContent = rawContent;
+        }
+        
+        // 5. 返回优化后的结果
+        return new AgentResponse(
+            List.of(new MessageDto("assistant", optimizedContent)), 
+            rawResponse.jobs(), 
+            rawResponse.analysis()
+        );
     }
 }
