@@ -2,13 +2,11 @@ package com.jobai.automation.config;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.tool.ToolCallbackProvider;
+import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import java.util.List;
 
 @Configuration
 public class AiConfig {
@@ -40,11 +38,17 @@ public class AiConfig {
     @Value("${ai.openai.model.common-agent:}")
     private String commonAgentModel;
 
+    @Autowired(required = false)
+    private SyncMcpToolCallbackProvider mcpToolCallbackProvider;
+
     @Bean("openAiChatClient")
-    public ChatClient openAiChatClient(ChatModel chatModel, com.jobai.automation.mcp.FilesystemMcpService filesystemMcpService) {
-        return ChatClient.builder(chatModel)
-                .defaultTools(filesystemMcpService)
-                .build();
+    public ChatClient openAiChatClient(ChatModel chatModel) {
+        if (mcpToolCallbackProvider != null) {
+            return ChatClient.builder(chatModel)
+                    .defaultToolCallbacks(mcpToolCallbackProvider.getToolCallbacks())
+                    .build();
+        }
+        return ChatClient.builder(chatModel).build();
     }
 
     public String getApiKey() {

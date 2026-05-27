@@ -16,6 +16,7 @@ import java.util.stream.Stream;
 /**
  * Lightweight Filesystem MCP service providing basic file operations for AI tool calling.
  * Used for context management in the Common Agent.
+ * Note: This is Spring AI Tool Calling, which works with MCP through Spring AI's integration.
  */
 @Service
 public class FilesystemMcpService {
@@ -36,9 +37,15 @@ public class FilesystemMcpService {
     public String read_file(String path) {
         log.info("MCP tool called: read_file {}", path);
         try {
-            Path filePath = Paths.get(BASE_DIR, path);
+            Path filePath;
+            if (path.startsWith(BASE_DIR + "/") || path.startsWith(BASE_DIR + "\\")) {
+                filePath = Paths.get(path);
+            } else {
+                filePath = Paths.get(BASE_DIR, path);
+            }
+
             if (!Files.exists(filePath)) {
-                return "Error: File not found: " + path;
+                return "Error: File not found: " + filePath.toString();
             }
             return Files.readString(filePath);
         } catch (IOException e) {
@@ -51,13 +58,14 @@ public class FilesystemMcpService {
     public String write_file(String path, String content) {
         log.info("MCP tool called: write_file {}", path);
         try {
-            Path filePath = Paths.get(BASE_DIR, path);
-            Path parentDir = filePath.getParent();
-            if (parentDir != null) {
-                Files.createDirectories(parentDir);
+            Path filePath;
+            if (path.startsWith(BASE_DIR + "/") || path.startsWith(BASE_DIR + "\\")) {
+                filePath = Paths.get(path);
             } else {
-                Files.createDirectories(Paths.get(BASE_DIR));
+                filePath = Paths.get(BASE_DIR, path);
             }
+
+            Files.createDirectories(filePath.getParent());
             Files.writeString(filePath, content);
             return "Success: Content written to " + path;
         } catch (IOException e) {
@@ -70,20 +78,21 @@ public class FilesystemMcpService {
     public List<String> list_directory(String path) {
         log.info("MCP tool called: list_directory {}", path);
         try {
-            Path dirPath = (path == null || path.isEmpty() || path.equals("."))
-                    ? Paths.get(BASE_DIR)
-                    : Paths.get(BASE_DIR, path);
+            Path dirPath;
+            if (path == null || path.isBlank()) {
+                dirPath = Paths.get(BASE_DIR);
+            } else if (path.startsWith(BASE_DIR + "/") || path.startsWith(BASE_DIR + "\\")) {
+                dirPath = Paths.get(path);
+            } else {
+                dirPath = Paths.get(BASE_DIR, path);
+            }
 
             if (!Files.exists(dirPath)) {
-                return List.of("Error: Directory not found: " + path);
+                Files.createDirectories(dirPath);
             }
 
             try (Stream<Path> stream = Files.list(dirPath)) {
-                return stream
-                        .map(p -> {
-                            String fileName = p.getFileName().toString();
-                            return Files.isDirectory(p) ? fileName + "/" : fileName;
-                        })
+                return stream.map(p -> Files.isDirectory(p) ? p.getFileName().toString() + "/" : p.getFileName().toString())
                         .collect(Collectors.toList());
             }
         } catch (IOException e) {

@@ -110,9 +110,10 @@
             <version>${spring-ai-alibaba.version}</version>
         </dependency>
         <!-- MCP Client Starter -->
+        <!-- MCP Client -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-starter-mcp-client-webflux</artifactId>
+            <artifactId>spring-ai-starter-mcp-client</artifactId>
             <version>${spring-ai.version}</version>
         </dependency>
     </dependencies>
@@ -122,6 +123,14 @@
             <id>spring-milestones</id>
             <name>Spring Milestones</name>
             <url>https://repo.spring.io/milestone</url>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+        <repository>
+            <id>maven-central</id>
+            <name>Maven Central</name>
+            <url>https://repo1.maven.org/maven2</url>
             <snapshots>
                 <enabled>false</enabled>
             </snapshots>
@@ -145,7 +154,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <jvmArguments>-Dfile.encoding=UTF-8 -Dconsole.encoding=UTF-8</jvmArguments>
+                    <jvmArguments>-Dfile.encoding=UTF-8</jvmArguments>
                 </configuration>
             </plugin>
             <plugin>

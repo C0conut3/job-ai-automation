@@ -5,7 +5,6 @@ import com.jobai.automation.agent.dto.AgentResponse;
 import com.jobai.automation.agent.dto.MessageDto;
 import com.jobai.automation.agent.service.CommonAgentService;
 import com.jobai.automation.config.AiConfig;
-import com.jobai.automation.mcp.FilesystemMcpService;
 import com.jobai.automation.service.AiService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,12 +25,10 @@ public class CommonAgentServiceImpl implements CommonAgentService {
 
     private final AiConfig aiConfig;
     private final AiService aiService;
-    private final FilesystemMcpService filesystemMcpService;
 
-    public CommonAgentServiceImpl(AiConfig aiConfig, AiService aiService, FilesystemMcpService filesystemMcpService) {
+    public CommonAgentServiceImpl(AiConfig aiConfig, AiService aiService) {
         this.aiConfig = aiConfig;
         this.aiService = aiService;
-        this.filesystemMcpService = filesystemMcpService;
     }
 
     @Override
@@ -54,27 +51,36 @@ public class CommonAgentServiceImpl implements CommonAgentService {
             String sessionId = request.sessionId() != null ? request.sessionId() : "default_session";
             String contextFile = "context_" + userId + "_" + sessionId + ".txt";
 
-            // System prompt: 告知AI使用read_file读取上下文
+            // System prompt: 智能判断是否需要读取上下文
             String systemPrompt = "你是一位专业的职业顾问和技术导师，专注于帮助求职者提升技能和职业发展。\n\n" +
-                    "【上下文管理】：\n" +
-                    "- 上下文文件名：context_{userId}_{sessionId}.txt，其中 userId=" + userId + ", sessionId=" + sessionId + "\n" +
-                    "- 当需要了解历史对话时，调用 read_file(\"" + contextFile + "\") 读取上下文\n" +
-                    "- 系统会在每次对话后自动保存，无需你调用写入工具\n\n" +
+                    "【工具使用规则】：\n" +
+                    "- read_file(path): 读取指定文件内容，用于获取历史对话上下文\n" +
+                    "- write_file(path, content): 写入文件（系统自动调用，无需你使用）\n" +
+                    "- list_directory(path): 列出目录内容\n\n" +
+                    "【上下文读取策略】：\n" +
+                    "1. 智能判断：根据用户问题决定是否需要读取历史上下文\n" +
+                    "2. 需要读取的情况：\n" +
+                    "   - 用户提到\"之前\"、\"上次\"、\"刚才\"、\"之前说的\"、\"继续\"等词\n" +
+                    "   - 用户的问题明显需要结合历史对话才能理解（如\"这个职位怎么样\"、\"再详细说说\"）\n" +
+                    "   - 用户直接引用之前讨论的内容\n" +
+                    "3. 不需要读取的情况：\n" +
+                    "   - 用户提出的是独立的、完整的问题（如\"什么是Java？\"、\"如何准备面试？\"）\n" +
+                    "   - 问题本身包含足够的信息，无需上下文即可回答\n" +
+                    "4. 上下文文件路径：mcp_context/context_" + userId + "_" + sessionId + ".txt\n" +
+                    "5. 如果读取上下文文件为空或不存在，说明是新对话，直接回答即可\n\n" +
                     "【回答原则】：\n" +
-                    "1. 优先以用户当前问题为主，上下文内容仅作为辅助参考\n" +
-                    "2. 聚焦就业相关问题，包括面试、技术、职业规划等\n" +
-                    "3. 如果用户问题与就业无关，礼貌地引导用户询问就业相关话题\n\n" +
-                    "擅长领域包括：\n" +
+                    "1. 如果读取了上下文，回答时要自然地结合历史对话内容\n" +
+                    "2. 如果没有读取上下文，直接回答当前问题即可\n" +
+                    "3. 聚焦就业相关问题，包括面试、技术、职业规划等\n\n" +
+                    "【擅长领域】：\n" +
                     "- 面试技巧与准备\n" +
                     "- 技术面试题解答\n" +
                     "- 编程语言与技术知识\n" +
                     "- 职业发展规划\n" +
                     "- 学习路线建议\n" +
-                    "- 简历优化建议\n" +
-                    "- 职场沟通技巧\n\n" +
-                    "请用友好、专业的语气回复，语言简洁明了，重点突出可执行性。";
+                    "- 简历优化建议\n\n" +
+                    "请用友好、专业的语气回复，保持对话自然流畅。";
 
-            // User prompt: 只传递当前问题，AI通过Tool Calling读取上下文
             String userPrompt = userInput;
 
             // 调用AI（启用Tool Calling，AI主动读取上下文）

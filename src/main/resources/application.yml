@@ -24,13 +24,24 @@ spring:
           time_zone: Asia/Shanghai
   ai:
     dashscope:
-      api-key: sk-90be84e8e3054616ad876d37f949be54
+      api-key: #your api-key
       chat:
         options:
           model: qwen-plus
     mcp:
       client:
-        enabled: false
+        enabled: true
+        name: jobai-mcp-client
+        version: 1.0.0
+        type: SYNC
+        stdio:
+          connections:
+            filesystem-mcp:
+              command: "D:\\py\\python.exe"
+              args:
+                - mcp_server.py
+              working-dir: .
+              timeout: 60s
 
 server:
   port: 8080
@@ -40,6 +51,11 @@ logging:
     console: UTF-8
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  level:
+    root: INFO
+    com.jobai.automation: DEBUG
+    org.springframework.ai: DEBUG
+    io.modelcontextprotocol: DEBUG
 
 management:
   endpoints:
